@@ -9,13 +9,13 @@ var availableAdapters = []Adapter{
 	// NewClaudeAdapter(),
 }
 
-// DetectInstalledTools returns all detected AI tools on the system
-func DetectInstalledTools() []Adapter {
-	detected := []Adapter{}
+// DetectInstalledTools returns the names of all detected AI tools on the system
+func DetectInstalledTools() []string {
+	detected := []string{}
 
 	for _, adapter := range availableAdapters {
 		if adapter.Detect() {
-			detected = append(detected, adapter)
+			detected = append(detected, adapter.Name())
 		}
 	}
 

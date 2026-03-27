@@ -1,0 +1,26 @@
+name: python
+version: 2.1.0
+type: skill
+description: Python development expertise including best practices, libraries, and frameworks
+author:
+  name: AIT Team
+  email: team@ait.dev
+license: MIT
+compatibility:
+  - opencode
+  - cursor
+  - claude
+files:
+  opencode: SKILL.md
+  cursor: SKILL.md
+  claude: SKILL.md
+tags:
+  - python
+  - development
+  - frameworks
+keywords:
+  - python
+  - django
+  - flask
+  - fastapi
+  - pytest

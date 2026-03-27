@@ -68,8 +68,12 @@ func CheckDirWritable(path string) error {
 }
 
 // HomeDir returns the user's home directory
-func HomeDir() (string, error) {
-	return os.UserHomeDir()
+func HomeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(fmt.Sprintf("failed to get home directory: %v", err))
+	}
+	return home
 }
 
 // ExpandHome expands ~ to the user's home directory
@@ -78,10 +82,11 @@ func ExpandHome(path string) (string, error) {
 		return path, nil
 	}
 
-	home, err := HomeDir()
-	if err != nil {
-		return "", err
-	}
-
+	home := HomeDir()
 	return filepath.Join(home, path[1:]), nil
+}
+
+// ReadFile reads a file and returns its contents
+func ReadFile(path string) ([]byte, error) {
+	return os.ReadFile(path)
 }

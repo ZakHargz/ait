@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"github.com/apex-ai/ait/internal/packages"
 	"github.com/apex-ai/ait/internal/utils"

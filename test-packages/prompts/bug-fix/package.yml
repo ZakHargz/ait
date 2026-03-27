@@ -1,0 +1,25 @@
+name: bug-fix
+version: 1.0.0
+type: prompt
+description: A prompt template for fixing bugs systematically
+author:
+  name: AIT Team
+  email: team@ait.dev
+license: MIT
+compatibility:
+  - opencode
+  - cursor
+  - claude
+files:
+  opencode: prompt.txt
+  cursor: prompt.txt
+  claude: prompt.txt
+tags:
+  - debugging
+  - bug-fix
+  - troubleshooting
+keywords:
+  - bug
+  - fix
+  - debug
+  - troubleshoot

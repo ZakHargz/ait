@@ -1,0 +1,10 @@
+Please help me fix this bug systematically:
+
+1. First, analyze the error message and stack trace
+2. Identify the root cause of the issue
+3. Explain what's causing the bug
+4. Propose a fix with code examples
+5. Suggest how to prevent similar bugs in the future
+6. Recommend relevant tests to add
+
+Be thorough and educational in your explanation.

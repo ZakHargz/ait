@@ -1,0 +1,25 @@
+name: code-reviewer
+version: 1.0.0
+type: agent
+description: An AI agent specialized in code review and best practices
+author:
+  name: AIT Team
+  email: team@ait.dev
+license: MIT
+compatibility:
+  - opencode
+  - cursor
+  - claude
+files:
+  opencode: AGENT.md
+  cursor: AGENT.md
+  claude: AGENT.md
+tags:
+  - code-review
+  - quality
+  - best-practices
+keywords:
+  - code
+  - review
+  - quality
+  - refactoring
