@@ -102,6 +102,29 @@ ait list
 ait list --target opencode
 ```
 
+### 5. Update Packages
+
+```bash
+# Update all packages to latest compatible versions
+ait update
+
+# Update specific packages
+ait update code-reviewer python-skill
+
+# Update for specific tools only
+ait update --target opencode
+```
+
+### 6. Uninstall Packages
+
+```bash
+# Uninstall a package from all tools
+ait uninstall code-reviewer
+
+# Uninstall from specific tools only
+ait uninstall code-reviewer --target cursor
+```
+
 ## Package Specification Format
 
 Packages are specified using the format: `type:location@version`
@@ -324,6 +347,36 @@ ait list
 ait list --target opencode
 ```
 
+### ait update
+
+Update packages to their latest compatible versions:
+
+```bash
+# Update all packages from ait.yml
+ait update
+
+# Update specific packages
+ait update code-reviewer python-skill
+
+# Update for specific tools
+ait update --target opencode --target cursor
+```
+
+### ait uninstall
+
+Remove installed packages:
+
+```bash
+# Uninstall from all tools where it's installed
+ait uninstall code-reviewer
+
+# Uninstall from specific tools only
+ait uninstall code-reviewer --target cursor
+
+# Uninstall multiple packages
+ait uninstall code-reviewer python-skill
+```
+
 ## Supported AI Tools
 
 ### OpenCode ✅
@@ -334,28 +387,38 @@ ait list --target opencode
 - **Skills**: `~/.config/opencode/skills/<name>/SKILL.md`
 - **Prompts**: `~/.config/opencode/prompts/<name>.txt`
 
-### Cursor 🔄
+### Cursor ✅
 
-- **Status**: Planned
-- **Location**: `~/Library/Application Support/Cursor/User/`
-- **Format**: Converts agents to `.cursorrules`
+- **Status**: Fully supported
+- **Location**: `~/Library/Application Support/Cursor/User/ait-*` (macOS)
+- **Format**: Converts AGENT.md to `.cursorrules` format
+- **Agents**: `~/Library/Application Support/Cursor/User/ait-agents/<name>/.cursorrules`
+- **Skills**: `~/Library/Application Support/Cursor/User/ait-skills/<name>/SKILL.md`
+- **Prompts**: `~/Library/Application Support/Cursor/User/ait-prompts/<name>.txt`
 
-### Claude Desktop 🔄
+### Claude Desktop ✅
 
-- **Status**: Planned
+- **Status**: Fully supported
 - **Location**: `~/.claude/`
 - **Format**: Same as OpenCode (AGENT.md, SKILL.md)
+- **Agents**: `~/.claude/agents/<name>/AGENT.md`
+- **Skills**: `~/.claude/skills/<name>/SKILL.md`
+- **Prompts**: `~/.claude/prompts/<name>.txt`
 
 ## Development Status
 
-### ✅ Implemented (MVP)
+### ✅ Implemented (v0.2.0)
 
 - CLI framework (Cobra/Viper)
 - Configuration parsing (ait.yml, package.yml, ait.lock)
 - `ait init` command
 - `ait install` command with full features
 - `ait list` command
+- `ait update` command - Update packages to latest compatible versions
+- `ait uninstall` command - Remove packages from tools
 - OpenCode adapter (agents, skills, prompts)
+- Cursor adapter (agents, skills, prompts with .cursorrules conversion)
+- Claude Desktop adapter (agents, skills, prompts)
 - Git-based sources (GitHub, GitLab, generic)
 - Local filesystem sources
 - Semantic versioning with constraints
@@ -363,17 +426,17 @@ ait list --target opencode
 - Lock file generation
 - Local caching (~/.ait/cache/)
 - Test package repository
+- Multi-tool detection and installation
 
 ### 🔄 Planned
 
-- `ait update` command - Update packages to latest
-- `ait uninstall` command - Remove packages
-- Cursor adapter - .cursorrules conversion
-- Claude Desktop adapter
 - `ait search` command - Package discovery
 - `ait audit` command - Security scanning
 - `ait doctor` command - Health checks
 - MCP server support
+- Package registry/marketplace
+- VSCode adapter
+- Additional IDE support
 
 ## Project Structure
 
@@ -384,12 +447,16 @@ ait/
 │   ├── adapters/         # Platform adapters
 │   │   ├── adapter.go   # Interface
 │   │   ├── opencode.go  # OpenCode implementation
+│   │   ├── cursor.go    # Cursor implementation
+│   │   ├── claude.go    # Claude Desktop implementation
 │   │   └── detector.go  # Tool detection
 │   ├── cli/              # Commands
 │   │   ├── root.go      # Root command
 │   │   ├── init.go      # Init command
 │   │   ├── install.go   # Install command
-│   │   └── list.go      # List command
+│   │   ├── list.go      # List command
+│   │   ├── update.go    # Update command
+│   │   └── uninstall.go # Uninstall command
 │   ├── config/           # Configuration
 │   │   ├── manifest.go  # ait.yml
 │   │   ├── package.go   # package.yml

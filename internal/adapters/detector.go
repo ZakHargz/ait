@@ -4,9 +4,8 @@ import "fmt"
 
 var availableAdapters = []Adapter{
 	NewOpenCodeAdapter(),
-	// Add more adapters as they are implemented
-	// NewCursorAdapter(),
-	// NewClaudeAdapter(),
+	NewCursorAdapter(),
+	NewClaudeAdapter(),
 }
 
 // DetectInstalledTools returns the names of all detected AI tools on the system
