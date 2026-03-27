@@ -18,7 +18,7 @@ A CLI package manager for AI agents, skills, prompts, and MCP servers. Think npm
 
 ```bash
 # Clone the repository
-git clone https://github.com/apex-ai/ait
+git clone https://github.com/ZakHargz/ait
 cd ait
 
 # Build and install globally
