@@ -16,6 +16,19 @@ A CLI package manager for AI agents, skills, prompts, and MCP servers. Think npm
 
 ## Installation
 
+### Using Homebrew (macOS/Linux) - Recommended
+
+```bash
+# Add the AIT tap
+brew tap zakhargz/ait
+
+# Install AIT
+brew install ait
+
+# Verify installation
+ait --version
+```
+
 ### From Source
 
 ```bash
@@ -24,18 +37,17 @@ git clone https://github.com/ZakHargz/ait
 cd ait
 
 # Build and install globally
-make build
-make install
+go build -o /usr/local/bin/ait cmd/ait/main.go
 
 # Or build without installing
-make build
+go build -o bin/ait cmd/ait/main.go
 ./bin/ait --version
 ```
 
 ### Requirements
 
-- Go 1.26+ (for building from source)
-- One or more AI tools: OpenCode, Cursor, or Claude Desktop
+- Go 1.26+ (for building from source only - not needed for Homebrew installation)
+- One or more AI tools: OpenCode, Cursor, Claude Desktop, or GitHub Copilot
 
 ## Quick Start
 
