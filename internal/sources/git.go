@@ -169,11 +169,44 @@ func (gs *GitSource) ensureRepo(repoURL, repoPath string) (*git.Repository, erro
 
 // resolveVersion resolves a version constraint to a specific git reference
 // Supports:
+//   - "latest" -> highest semver tag
 //   - Exact versions: "1.0.0" -> tag "v1.0.0"
 //   - Semver constraints: "^1.0.0", "~1.2.0" -> matching tags
 //   - Branch names: "main", "develop"
 //   - Commit hashes: "abc123..."
 func (gs *GitSource) resolveVersion(repo *git.Repository, versionSpec string) (string, error) {
+	// Handle "latest" - find the highest semver tag
+	if versionSpec == "latest" {
+		tags, err := gs.getTags(repo)
+		if err != nil {
+			return "", fmt.Errorf("failed to list tags: %w", err)
+		}
+
+		var latestVersion *semver.Version
+		var latestTag string
+
+		for _, tag := range tags {
+			// Try to parse tag as semver (strip 'v' prefix if present)
+			tagName := strings.TrimPrefix(tag, "v")
+			v, err := semver.NewVersion(tagName)
+			if err != nil {
+				continue // Skip non-semver tags
+			}
+
+			if latestVersion == nil || v.GreaterThan(latestVersion) {
+				latestVersion = v
+				latestTag = tag
+			}
+		}
+
+		if latestVersion != nil {
+			return latestTag, nil
+		}
+
+		// If no semver tags found, use default branch (main or master)
+		return "main", nil
+	}
+
 	// If it looks like a commit hash, use it directly
 	if len(versionSpec) == 40 || len(versionSpec) == 7 {
 		// Verify it exists

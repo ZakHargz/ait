@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/apex-ai/ait/internal/adapters"
 	"github.com/apex-ai/ait/internal/config"
@@ -46,6 +47,7 @@ Version formats:
 var (
 	installTargets []string
 	installSave    bool
+	installGlobal  bool
 )
 
 // installResult holds the result of installing a single package
@@ -57,8 +59,9 @@ type installResult struct {
 func init() {
 	rootCmd.AddCommand(installCmd)
 
-	installCmd.Flags().StringSliceVarP(&installTargets, "target", "t", []string{}, "target tools to install to (opencode, cursor, claude)")
+	installCmd.Flags().StringSliceVarP(&installTargets, "target", "t", []string{}, "target tools to install to (opencode, cursor, claude, project)")
 	installCmd.Flags().BoolVarP(&installSave, "save", "s", false, "save installed packages to ait.yml")
+	installCmd.Flags().BoolVarP(&installGlobal, "global", "g", false, "install globally to AI tools instead of project-local .ait/")
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
@@ -97,26 +100,22 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Detect available tools if no targets specified
-	if len(installTargets) == 0 {
-		utils.PrintInfo("Detecting installed AI tools...")
-		detectedTools := adapters.DetectInstalledTools()
-		if len(detectedTools) == 0 {
-			return fmt.Errorf("no AI tools detected. Install OpenCode, Cursor, or Claude Desktop first")
-		}
-		installTargets = detectedTools
-		utils.PrintInfo(fmt.Sprintf("Found tools: %v", installTargets))
-	}
+	// Determine installation mode: project-local or global
+	var targetAdapters map[string]adapters.Adapter
+	var err error
 
-	// Create adapters for target tools
-	targetAdapters := make(map[string]adapters.Adapter)
-	for _, target := range installTargets {
-		adapter, err := adapters.GetAdapter(target)
+	if installGlobal {
+		// Global installation to AI tools
+		targetAdapters, err = getGlobalAdapters(installTargets)
 		if err != nil {
-			utils.PrintWarning(fmt.Sprintf("Skipping %s: %s", target, err.Error()))
-			continue
+			return err
 		}
-		targetAdapters[target] = adapter
+	} else {
+		// Project-local installation to .ait/
+		targetAdapters, err = getProjectLocalAdapters()
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(targetAdapters) == 0 {
@@ -124,7 +123,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Parse and install each package
-	utils.PrintInfo(fmt.Sprintf("Installing %d package(s) to %d tool(s)...", len(specsToInstall), len(targetAdapters)))
+	utils.PrintInfo(fmt.Sprintf("Installing %d package(s) to %d location(s)...", len(specsToInstall), len(targetAdapters)))
 
 	// Load or create lock file
 	lockPath := "ait.lock"
@@ -234,4 +233,53 @@ func installToAdapter(pkg *packages.Package, adapter adapters.Adapter, toolName 
 	default:
 		return fmt.Errorf("unknown package type: %s", pkg.Type)
 	}
+}
+
+// getGlobalAdapters returns adapters for global AI tool installations
+func getGlobalAdapters(targets []string) (map[string]adapters.Adapter, error) {
+	// Detect available tools if no targets specified
+	if len(targets) == 0 {
+		utils.PrintInfo("Detecting installed AI tools...")
+		detectedTools := adapters.DetectInstalledTools()
+		if len(detectedTools) == 0 {
+			return nil, fmt.Errorf("no AI tools detected. Install OpenCode, Cursor, or Claude Desktop first")
+		}
+		targets = detectedTools
+		utils.PrintInfo(fmt.Sprintf("Found tools: %v", targets))
+	}
+
+	// Create adapters for target tools
+	targetAdapters := make(map[string]adapters.Adapter)
+	for _, target := range targets {
+		adapter, err := adapters.GetAdapter(target)
+		if err != nil {
+			utils.PrintWarning(fmt.Sprintf("Skipping %s: %s", target, err.Error()))
+			continue
+		}
+		targetAdapters[target] = adapter
+	}
+
+	return targetAdapters, nil
+}
+
+// getProjectLocalAdapters returns the project-root adapter for native tool detection
+func getProjectLocalAdapters() (map[string]adapters.Adapter, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Use ProjectRootAdapter which creates files that tools auto-detect
+	projectRootAdapter := adapters.NewProjectRootAdapter(cwd)
+
+	utils.PrintInfo("Installing to project root using tool-native conventions:")
+	utils.PrintInfo("  • .cursorrules (Cursor auto-detects)")
+	utils.PrintInfo("  • .github/copilot-instructions.md (GitHub Copilot auto-detects)")
+	utils.PrintInfo("  • .opencode/ (proposed for OpenCode)")
+	utils.PrintInfo("💡 Tip: Commit these files to git for team sharing!")
+	utils.PrintInfo("💡 Tip: Use --global flag to install to AI tools globally")
+
+	return map[string]adapters.Adapter{
+		"project-root": projectRootAdapter,
+	}, nil
 }

@@ -34,12 +34,14 @@ The command will:
 
 var (
 	uninstallTargets []string
+	uninstallGlobal  bool
 )
 
 func init() {
 	rootCmd.AddCommand(uninstallCmd)
 
-	uninstallCmd.Flags().StringSliceVarP(&uninstallTargets, "target", "t", []string{}, "target tools to uninstall from (opencode, cursor, claude)")
+	uninstallCmd.Flags().StringSliceVarP(&uninstallTargets, "target", "t", []string{}, "target tools to uninstall from (opencode, cursor, claude, project)")
+	uninstallCmd.Flags().BoolVarP(&uninstallGlobal, "global", "g", false, "uninstall globally from AI tools instead of project-local .ait/")
 }
 
 func runUninstall(cmd *cobra.Command, args []string) error {
@@ -57,29 +59,20 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine which tools to uninstall from
-	var targetTools []string
-	if len(uninstallTargets) > 0 {
-		targetTools = uninstallTargets
-	} else {
-		// If no targets specified, detect installed tools
-		utils.PrintInfo("Detecting installed AI tools...")
-		detectedTools := adapters.DetectInstalledTools()
-		if len(detectedTools) == 0 {
-			return fmt.Errorf("no AI tools detected")
-		}
-		targetTools = detectedTools
-		utils.PrintInfo(fmt.Sprintf("Found tools: %v", targetTools))
-	}
+	var targetAdapters map[string]adapters.Adapter
 
-	// Create adapters for target tools
-	targetAdapters := make(map[string]adapters.Adapter)
-	for _, target := range targetTools {
-		adapter, err := adapters.GetAdapter(target)
+	if uninstallGlobal {
+		// Global uninstall from AI tools
+		targetAdapters, err = getGlobalAdaptersForUninstall(uninstallTargets)
 		if err != nil {
-			utils.PrintWarning(fmt.Sprintf("Skipping %s: %s", target, err.Error()))
-			continue
+			return err
 		}
-		targetAdapters[target] = adapter
+	} else {
+		// Project-local uninstall from .ait/
+		targetAdapters, err = getProjectLocalAdapters()
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(targetAdapters) == 0 {
@@ -132,12 +125,17 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 
 		if uninstalledFromAny {
 			uninstalledCount++
+			// Get list of tool names from adapters
+			toolNames := make([]string, 0, len(targetAdapters))
+			for toolName := range targetAdapters {
+				toolNames = append(toolNames, toolName)
+			}
 			// If uninstalled from all tools (or specific targets), remove from lock
-			if shouldRemoveFromLock(lockedPkg.Installed, targetTools, len(uninstallTargets) == 0) {
+			if shouldRemoveFromLock(lockedPkg.Installed, toolNames, len(uninstallTargets) == 0) {
 				packagesToRemoveFromLock = append(packagesToRemoveFromLock, pkgName)
 			} else {
 				// Update lock file to remove the tools we uninstalled from
-				updateLockedPackageTools(&lockedPkg, targetTools)
+				updateLockedPackageTools(&lockedPkg, toolNames)
 				lockFile.Packages[pkgName] = lockedPkg
 			}
 		} else {
@@ -217,4 +215,34 @@ func updateLockedPackageTools(pkg *config.LockedPkg, toolsToRemove []string) {
 		}
 	}
 	pkg.Installed = newInstalled
+}
+
+// getGlobalAdaptersForUninstall returns adapters for global AI tool uninstalls
+func getGlobalAdaptersForUninstall(targets []string) (map[string]adapters.Adapter, error) {
+	var targetTools []string
+	if len(targets) > 0 {
+		targetTools = targets
+	} else {
+		// If no targets specified, detect installed tools
+		utils.PrintInfo("Detecting installed AI tools...")
+		detectedTools := adapters.DetectInstalledTools()
+		if len(detectedTools) == 0 {
+			return nil, fmt.Errorf("no AI tools detected")
+		}
+		targetTools = detectedTools
+		utils.PrintInfo(fmt.Sprintf("Found tools: %v", targetTools))
+	}
+
+	// Create adapters for target tools
+	targetAdapters := make(map[string]adapters.Adapter)
+	for _, target := range targetTools {
+		adapter, err := adapters.GetAdapter(target)
+		if err != nil {
+			utils.PrintWarning(fmt.Sprintf("Skipping %s: %s", target, err.Error()))
+			continue
+		}
+		targetAdapters[target] = adapter
+	}
+
+	return targetAdapters, nil
 }

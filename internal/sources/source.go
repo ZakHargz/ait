@@ -47,27 +47,30 @@ type PackageSpec struct {
 // Supported formats:
 //
 //	github:org/repo/path/to/package@version
+//	github:org/repo/path/to/package           (version defaults to "latest")
 //	gitlab:org/repo/path/to/package@version
 //	git:https://git.example.com/repo/path/to/package@version
+//	local:./path/to/package@version
 //	local:./path/to/package
 func ParsePackageSpec(spec string) (*PackageSpec, error) {
 	// Split by colon to get source type
 	parts := strings.SplitN(spec, ":", 2)
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid package spec format (expected 'type:path@version'): %s", spec)
+		return nil, fmt.Errorf("invalid package spec format (expected 'type:path[@version]'): %s", spec)
 	}
 
 	sourceType := parts[0]
 	remainder := parts[1]
 
-	// Split by @ to get version
+	// Split by @ to get version (optional)
 	pathParts := strings.SplitN(remainder, "@", 2)
-	if len(pathParts) != 2 {
-		return nil, fmt.Errorf("invalid package spec format (missing @version): %s", spec)
-	}
-
 	pathStr := pathParts[0]
-	version := pathParts[1]
+
+	// Default to "latest" if no version specified
+	version := "latest"
+	if len(pathParts) == 2 {
+		version = pathParts[1]
+	}
 
 	// For local paths, no need to split further
 	if sourceType == "local" {

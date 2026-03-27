@@ -73,6 +73,15 @@ func (m *Manifest) Write(path string) error {
 	return nil
 }
 
+// ToYAML converts the manifest to YAML string
+func (m *Manifest) ToYAML() (string, error) {
+	data, err := yaml.Marshal(m)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+	return string(data), nil
+}
+
 // Exists checks if a manifest file exists at the given path
 func ManifestExists(path string) bool {
 	_, err := os.Stat(path)
