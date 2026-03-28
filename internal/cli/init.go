@@ -81,7 +81,6 @@ func createDefaultManifest() *config.Manifest {
 	return &config.Manifest{
 		Name:    name,
 		Version: initVersion,
-		Sources: []config.Source{},
 		Dependencies: config.Dependencies{
 			Agents:  []string{},
 			Skills:  []string{},
@@ -117,7 +116,6 @@ func promptForManifest() *config.Manifest {
 		Name:        name,
 		Version:     version,
 		Description: description,
-		Sources:     []config.Source{},
 		Dependencies: config.Dependencies{
 			Agents:  []string{},
 			Skills:  []string{},

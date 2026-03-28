@@ -2,6 +2,8 @@
 
 A CLI package manager for AI agents, skills, prompts, and MCP servers. Think npm/pip for AI tooling across OpenCode, Cursor, Claude Desktop, and more.
 
+> **🔄 Aligning with Standards**: AIT is actively aligning with [Microsoft's Agent Package Manager (APM)](https://microsoft.github.io/apm/) format and ecosystem standards including [AGENTS.md](https://agents.md), [Agent Skills](https://agentskills.io), and [Model Context Protocol (MCP)](https://modelcontextprotocol.io). This ensures maximum compatibility and interoperability across AI development tools.
+
 ## Features
 
 - 📦 **Declarative Dependencies** - Define AI tools in `ait.yml`
@@ -354,15 +356,10 @@ name: my-project
 version: 1.0.0
 description: My AI-powered project
 
-# Optional: Named package sources
-sources:
-  - name: company-toolkit
-    url: github:myorg/ai-toolkit
-
 dependencies:
   agents:
     - github:org/repo/agents/code-reviewer        # Latest version (recommended)
-    - company-toolkit/agents/custom-agent@~2.0.0  # Version constraint
+    - github:myorg/ai-toolkit/agents/custom-agent@~2.0.0  # Version constraint
   skills:
     - github:org/repo/skills/python               # Latest version
   prompts:
@@ -668,16 +665,13 @@ targets:
 # ait.yml
 name: team-project
 version: 1.0.0
-sources:
-  - name: company
-    url: github:mycompany/ai-toolkit
 dependencies:
   agents:
-    - company/agents/security-reviewer@^2.0.0      # Caret constraint
-    - company/agents/performance-analyzer          # Latest version
+    - github:mycompany/ai-toolkit/agents/security-reviewer@^2.0.0      # Caret constraint
+    - github:mycompany/ai-toolkit/agents/performance-analyzer          # Latest version
   skills:
-    - company/skills/python@^3.0.0
-    - company/skills/terraform                     # Latest version
+    - github:mycompany/ai-toolkit/skills/python@^3.0.0
+    - github:mycompany/ai-toolkit/skills/terraform                     # Latest version
 targets:
   - opencode
   - cursor
@@ -714,13 +708,61 @@ make test        # Run tests (when available)
 make clean       # Clean build artifacts
 ```
 
+## Relationship with Microsoft APM
+
+AIT and [Microsoft's Agent Package Manager (APM)](https://microsoft.github.io/apm/) share the same vision: **making AI agent configuration portable, versioned, and easy to share**. While both tools solve similar problems, they approach them differently:
+
+### How AIT Differs
+
+- **Multi-tool focus**: AIT deploys to tool-native paths (`.cursorrules`, `.github/copilot-instructions.md`) that work across Cursor, GitHub Copilot, OpenCode, and Claude Desktop
+- **Project-first**: Default behavior is project-level installation for team sharing
+- **Simpler start**: Fewer features, easier to understand and adopt
+- **Lightweight**: Single binary, no complex compilation step
+
+### Convergence Path
+
+AIT is actively aligning with APM's manifest format (`apm.yml`) to ensure interoperability:
+
+**Current (AIT v0.3.x)**:
+```yaml
+name: my-project
+version: 1.0.0
+dependencies:
+  agents:
+    - github:org/repo/agents/code-reviewer
+  skills:
+    - github:org/repo/skills/python
+```
+
+**Future (APM-compatible)**:
+```yaml
+name: my-project
+version: 1.0.0
+dependencies:
+  apm:  # Unified dependency list
+    - org/repo/agents/code-reviewer
+    - org/repo/skills/python
+```
+
+### Why Both Projects Matter
+
+- **APM** - Microsoft-backed, comprehensive, enterprise-focused, deep GitHub integration
+- **AIT** - Community-driven, lightweight, multi-tool support, project-level focus
+
+We believe in ecosystem standards and will continue aligning with APM's format while maintaining AIT's unique value proposition of project-native tool detection and multi-tool support.
+
 ## License
 
 MIT
 
 ## Acknowledgments
 
+Built on community standards:
+- [AGENTS.md](https://agents.md) - Agent definition format
+- [Agent Skills](https://agentskills.io) - Skill specification
+- [Model Context Protocol (MCP)](https://modelcontextprotocol.io) - Tool integration standard
+
 Inspired by:
+- [Microsoft APM](https://microsoft.github.io/apm/) - Agent Package Manager
 - npm (Node.js package manager)
 - pip (Python package manager)
-- Microsoft APM (AI package manager concept)

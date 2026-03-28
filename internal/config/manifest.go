@@ -12,18 +12,9 @@ type Manifest struct {
 	Name         string         `yaml:"name"`
 	Version      string         `yaml:"version"`
 	Description  string         `yaml:"description,omitempty"`
-	Sources      []Source       `yaml:"sources"`
 	Dependencies Dependencies   `yaml:"dependencies"`
 	Targets      []string       `yaml:"targets,omitempty"`
 	Overrides    map[string]any `yaml:"overrides,omitempty"`
-}
-
-// Source represents a package source repository
-type Source struct {
-	Name    string `yaml:"name"`
-	URL     string `yaml:"url"`
-	Ref     string `yaml:"ref,omitempty"`
-	Default bool   `yaml:"default,omitempty"`
 }
 
 // Dependencies represents all types of dependencies
