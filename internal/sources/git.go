@@ -148,7 +148,7 @@ func (gs *GitSource) ensureRepo(repoURL, repoPath string) (*git.Repository, erro
 	}
 
 	// Clone repository
-	utils.PrintInfo(fmt.Sprintf("Cloning repository from %s...", repoURL))
+	utils.PrintInfo("Cloning repository from %s...", repoURL)
 
 	// Ensure cache directory exists
 	if err := utils.EnsureDir(filepath.Dir(repoPath)); err != nil {

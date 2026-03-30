@@ -76,12 +76,11 @@ func (r *Resolver) resolveSpec(specStr string) ([]*packages.Package, error) {
 	result := []*packages.Package{}
 
 	// Resolve dependencies recursively
-	if pkg.Metadata != nil && pkg.Metadata.Dependencies != nil {
-		deps := collectDependencies(pkg.Metadata.Dependencies)
-		for _, depSpec := range deps {
+	if pkg.Metadata != nil && len(pkg.Metadata.Dependencies) > 0 {
+		for _, depSpec := range pkg.Metadata.Dependencies {
 			depPkgs, err := r.resolveSpec(depSpec)
 			if err != nil {
-				return nil, fmt.Errorf("failed to resolve dependency %s of %s: %w", depSpec, pkg.Name, err)
+				return nil, fmt.Errorf("failed to resolve dependency %s: %w", depSpec, err)
 			}
 			result = append(result, depPkgs...)
 		}
@@ -91,21 +90,6 @@ func (r *Resolver) resolveSpec(specStr string) ([]*packages.Package, error) {
 	result = append(result, pkg)
 
 	return result, nil
-}
-
-// collectDependencies collects all dependency specs from a Dependencies struct
-func collectDependencies(deps *config.Dependencies) []string {
-	if deps == nil {
-		return []string{}
-	}
-
-	allDeps := []string{}
-	allDeps = append(allDeps, deps.Agents...)
-	allDeps = append(allDeps, deps.Skills...)
-	allDeps = append(allDeps, deps.Prompts...)
-	allDeps = append(allDeps, deps.MCP...)
-
-	return allDeps
 }
 
 // GetResolutionOrder returns packages in topological order (dependencies first)

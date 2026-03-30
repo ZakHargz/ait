@@ -26,6 +26,8 @@ type Source interface {
 //	github:org/repo/path/to/package@1.0.0
 //	github:org/repo/agents/code-reviewer@^1.2.0
 //	gitlab:org/repo/skills/python@~2.0.0
+//	org/repo/path/to/package@1.0.0              (APM shorthand, defaults to GitHub)
+//	gitlab.com/org/repo/skills/python@~2.0.0    (FQDN host format)
 type PackageSpec struct {
 	// Source type (github, gitlab, git, local)
 	Type string
@@ -41,6 +43,9 @@ type PackageSpec struct {
 
 	// Original spec string
 	Original string
+
+	// IsVirtualPackage indicates if this is a single file package (.agent.md, .skill.md, .prompt.md)
+	IsVirtualPackage bool
 }
 
 // ParsePackageSpec parses a package specification string
@@ -52,15 +57,42 @@ type PackageSpec struct {
 //	git:https://git.example.com/repo/path/to/package@version
 //	local:./path/to/package@version
 //	local:./path/to/package
+//	org/repo/path/to/package@version          (APM shorthand, defaults to GitHub)
+//	gitlab.com/org/repo/path/to/package       (FQDN format for non-GitHub hosts)
+//	org/repo/agents/reviewer.agent.md@1.0.0   (Virtual package - single file)
 func ParsePackageSpec(spec string) (*PackageSpec, error) {
-	// Split by colon to get source type
-	parts := strings.SplitN(spec, ":", 2)
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid package spec format (expected 'type:path[@version]'): %s", spec)
-	}
+	originalSpec := spec
+	var sourceType string
+	var remainder string
 
-	sourceType := parts[0]
-	remainder := parts[1]
+	// Check if spec has explicit source type prefix (contains : but not ://)
+	colonIndex := strings.Index(spec, ":")
+	hasExplicitType := colonIndex > 0 && !strings.HasPrefix(spec[colonIndex:], "://")
+
+	if hasExplicitType {
+		// Format: type:path[@version]
+		parts := strings.SplitN(spec, ":", 2)
+		sourceType = parts[0]
+		remainder = parts[1]
+	} else {
+		// APM shorthand format: org/repo/path[@version] or host.com/org/repo/path[@version]
+		// Check if it starts with a known host FQDN
+		if strings.HasPrefix(spec, "gitlab.com/") {
+			sourceType = "gitlab"
+			remainder = strings.TrimPrefix(spec, "gitlab.com/")
+		} else if strings.HasPrefix(spec, "bitbucket.org/") {
+			sourceType = "git"
+			remainder = spec // Keep full URL for git source
+		} else if strings.HasPrefix(spec, "./") || strings.HasPrefix(spec, "/") || strings.HasPrefix(spec, "~/") {
+			// Local path without prefix
+			sourceType = "local"
+			remainder = spec
+		} else {
+			// Default to GitHub for shorthand format
+			sourceType = "github"
+			remainder = spec
+		}
+	}
 
 	// Split by @ to get version (optional)
 	pathParts := strings.SplitN(remainder, "@", 2)
@@ -72,13 +104,17 @@ func ParsePackageSpec(spec string) (*PackageSpec, error) {
 		version = pathParts[1]
 	}
 
+	// Check if this is a virtual package (single file)
+	isVirtual := isVirtualPackage(pathStr)
+
 	// For local paths, no need to split further
 	if sourceType == "local" {
 		return &PackageSpec{
-			Type:     sourceType,
-			Path:     pathStr,
-			Version:  version,
-			Original: spec,
+			Type:             sourceType,
+			Path:             pathStr,
+			Version:          version,
+			Original:         originalSpec,
+			IsVirtualPackage: isVirtual,
 		}, nil
 	}
 
@@ -86,7 +122,7 @@ func ParsePackageSpec(spec string) (*PackageSpec, error) {
 	// Format: org/repo/path/to/package
 	pathComponents := strings.SplitN(pathStr, "/", 3)
 	if len(pathComponents) < 2 {
-		return nil, fmt.Errorf("invalid package spec format (expected at least org/repo): %s", spec)
+		return nil, fmt.Errorf("invalid package spec format (expected at least org/repo): %s", originalSpec)
 	}
 
 	repo := filepath.Join(pathComponents[0], pathComponents[1])
@@ -96,12 +132,32 @@ func ParsePackageSpec(spec string) (*PackageSpec, error) {
 	}
 
 	return &PackageSpec{
-		Type:     sourceType,
-		Repo:     repo,
-		Path:     pkgPath,
-		Version:  version,
-		Original: spec,
+		Type:             sourceType,
+		Repo:             repo,
+		Path:             pkgPath,
+		Version:          version,
+		Original:         originalSpec,
+		IsVirtualPackage: isVirtual,
 	}, nil
+}
+
+// isVirtualPackage checks if the path represents a virtual package (single file)
+// Virtual packages end with specific extensions like .agent.md, .skill.md, .prompt.md
+func isVirtualPackage(path string) bool {
+	virtualExtensions := []string{
+		".agent.md",
+		".skill.md",
+		".prompt.md",
+		".instructions.md",
+		".chatmode.md",
+	}
+
+	for _, ext := range virtualExtensions {
+		if strings.HasSuffix(path, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 // String returns the string representation of the package spec

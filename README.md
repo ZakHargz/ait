@@ -68,33 +68,56 @@ This creates an `ait.yml` manifest:
 ```yaml
 name: my-project
 version: 1.0.0
-dependencies:
-  agents: []
-  skills: []
-  prompts: []
+dependencies: []
 targets:
   - opencode
 ```
 
 ### 2. Add Dependencies
 
-Edit `ait.yml` to add packages:
+Edit `ait.yml` to add packages as a simple flat list:
 
 ```yaml
 name: my-project
 version: 1.0.0
 dependencies:
-  agents:
-    - github:org/repo/agents/code-reviewer          # Latest version (recommended)
-    - github:org/repo/agents/test-generator@1.0.0   # Specific version
-  skills:
-    - github:org/repo/skills/python                 # Latest version (recommended)
-    - github:org/repo/skills/docker@^2.0.0          # Version constraint
-  prompts:
-    - github:org/repo/prompts/debug@~1.5.0
+  # GitHub shorthand (no prefix needed - defaults to GitHub)
+  - org/repo/agents/code-reviewer           # Latest version (recommended)
+  - org/repo/agents/test-generator@1.0.0    # Specific version
+  - org/repo/skills/python                  # Latest version
+  - org/repo/skills/docker@^2.0.0           # Version constraint (^, ~)
+  - org/repo/prompts/debug@~1.5.0
+  
+  # Virtual packages (single files)
+  - org/awesome/agents/reviewer.agent.md@1.0.0
+  - org/awesome/skills/python.skill.md
+  
+  # Other Git hosts (use FQDN)
+  - gitlab.com/myorg/packages/agents/helper
+  
+  # Local packages
+  - ./my-packages/custom-agent
 ```
 
 **Pro Tip**: Omit `@version` to automatically get the latest version!
+
+<details>
+<summary><b>Legacy Format (still supported)</b></summary>
+
+The old format with separate `agents`, `skills`, and `prompts` lists is still supported for backward compatibility:
+
+```yaml
+dependencies:
+  agents:
+    - github:org/repo/agents/code-reviewer
+  skills:
+    - github:org/repo/skills/python
+  prompts:
+    - github:org/repo/prompts/debug
+```
+
+Note: The `github:` prefix is required in legacy format. We recommend migrating to the flat list format above.
+</details>
 
 ### 3. Install Packages
 
@@ -225,30 +248,49 @@ ait install --global github:org/repo/agents/code-reviewer
 
 ## Package Specification Format
 
-Packages are specified using the format: `type:location@version`
+Dependencies are specified as a simple flat list with GitHub shorthand by default:
 
-### Supported Sources
+```yaml
+dependencies:
+  # GitHub (default, no prefix needed)
+  - org/repo/agents/code-reviewer@1.0.0
+  - org/repo/skills/python               # Latest version
+  
+  # Other Git hosts (use FQDN)
+  - gitlab.com/org/repo/agents/helper@2.0.0
+  - bitbucket.org/org/repo/skills/docker
+  
+  # Virtual packages (single files)
+  - org/repo/agents/reviewer.agent.md
+  - org/repo/skills/python.skill.md
+  - org/repo/prompts/debug.prompt.md
+  
+  # Local packages
+  - ./path/to/package
+  - ~/packages/agents/custom
+```
 
-**GitHub:**
-```
-github:org/repo/path/to/package@version
+**Virtual Packages**: Files ending in `.agent.md`, `.skill.md`, `.prompt.md`, `.instructions.md`, or `.chatmode.md` can be installed directly without requiring a `package.yml` file.
+
+### Legacy Format (Still Supported)
+
+The original format with explicit source type prefixes and nested structure:
+
+```yaml
+dependencies:
+  agents:
+    - github:org/repo/agents/code-reviewer@1.0.0
+  skills:
+    - gitlab:org/repo/skills/python@^2.0.0
+  prompts:
+    - local:./my-prompts/debug
 ```
 
-**GitLab:**
-```
-gitlab:org/repo/path/to/package@version
-```
-
-**Generic Git:**
-```
-git:https://git.example.com/repo/path/to/package@version
-```
-
-**Local Filesystem:**
-```
-local:./path/to/package@version
-local:~/packages/agents/code-reviewer@1.0.0
-```
+**Supported source prefixes in legacy format:**
+- `github:org/repo/path/to/package@version` - GitHub repositories
+- `gitlab:org/repo/path/to/package@version` - GitLab repositories
+- `git:https://git.example.com/repo/path@version` - Generic Git URLs
+- `local:./path/to/package` - Local filesystem paths
 
 ### Version Formats
 
@@ -292,9 +334,8 @@ files:
   opencode: AGENT.md
   cursor: AGENT.md
   claude: AGENT.md
-dependencies:           # Optional: Package dependencies
-  skills:
-    - github:org/repo/skills/git-workflow@^1.0.0
+dependencies:           # Optional: Package dependencies (flat list)
+  - org/repo/skills/git-workflow@^1.0.0
 tags:
   - code-review
   - quality
@@ -357,15 +398,12 @@ version: 1.0.0
 description: My AI-powered project
 
 dependencies:
-  agents:
-    - github:org/repo/agents/code-reviewer        # Latest version (recommended)
-    - github:myorg/ai-toolkit/agents/custom-agent@~2.0.0  # Version constraint
-  skills:
-    - github:org/repo/skills/python               # Latest version
-  prompts:
-    - local:./prompts/custom                      # Local package, latest
-  mcp:
-    - github:org/repo/servers/custom-mcp@^1.0.0
+  - org/repo/agents/code-reviewer                    # Latest version (recommended)
+  - myorg/ai-toolkit/agents/custom-agent@~2.0.0      # Version constraint
+  - org/repo/skills/python                           # Latest version
+  - org/repo/agents/reviewer.agent.md                # Virtual package
+  - ./prompts/custom                                 # Local package
+  - org/repo/servers/custom-mcp@^1.0.0               # MCP server
 
 # Target AI tools
 targets:
@@ -652,9 +690,8 @@ ait/
 name: my-agents
 version: 1.0.0
 dependencies:
-  agents:
-    - local:~/my-agents/code-reviewer    # Latest version
-    - local:~/my-agents/documentation    # Latest version
+  - ~/my-agents/code-reviewer    # Local path, latest version
+  - ~/my-agents/documentation    # Local path, latest version
 targets:
   - opencode
 ```
@@ -666,31 +703,27 @@ targets:
 name: team-project
 version: 1.0.0
 dependencies:
-  agents:
-    - github:mycompany/ai-toolkit/agents/security-reviewer@^2.0.0      # Caret constraint
-    - github:mycompany/ai-toolkit/agents/performance-analyzer          # Latest version
-  skills:
-    - github:mycompany/ai-toolkit/skills/python@^3.0.0
-    - github:mycompany/ai-toolkit/skills/terraform                     # Latest version
+  - mycompany/ai-toolkit/agents/security-reviewer@^2.0.0       # Caret constraint
+  - mycompany/ai-toolkit/agents/performance-analyzer           # Latest version
+  - mycompany/ai-toolkit/skills/python@^3.0.0
+  - mycompany/ai-toolkit/skills/terraform                      # Latest version
 targets:
   - opencode
   - cursor
 ```
 
-### Example 3: Public Packages
+### Example 3: Public Packages with Virtual Files
 
 ```yaml
 # ait.yml
 name: open-source-project
 version: 1.0.0
 dependencies:
-  agents:
-    - github:ai-packages/agents/code-reviewer      # Latest version (recommended)
-    - github:ai-packages/agents/test-generator@~2.1.0
-  skills:
-    - github:ai-packages/skills/javascript         # Latest version
-  prompts:
-    - github:ai-packages/prompts/debug-helper      # Latest version
+  - ai-packages/agents/code-reviewer                    # Latest version (recommended)
+  - ai-packages/agents/test-generator@~2.1.0
+  - ai-packages/skills/javascript                       # Latest version
+  - ai-packages/prompts/debug-helper                    # Latest version
+  - ai-packages/agents/reviewer.agent.md@1.0.0          # Virtual package (single file)
 targets:
   - opencode
 ```
@@ -710,46 +743,59 @@ make clean       # Clean build artifacts
 
 ## Relationship with Microsoft APM
 
-AIT and [Microsoft's Agent Package Manager (APM)](https://microsoft.github.io/apm/) share the same vision: **making AI agent configuration portable, versioned, and easy to share**. While both tools solve similar problems, they approach them differently:
+AIT and [Microsoft's Agent Package Manager (APM)](https://microsoft.github.io/apm/) share the same vision: **making AI agent configuration portable, versioned, and easy to share**. While inspired by APM, AIT takes a simpler approach optimized for multi-tool deployment.
 
 ### How AIT Differs
 
 - **Multi-tool focus**: AIT deploys to tool-native paths (`.cursorrules`, `.github/copilot-instructions.md`) that work across Cursor, GitHub Copilot, OpenCode, and Claude Desktop
 - **Project-first**: Default behavior is project-level installation for team sharing
-- **Simpler start**: Fewer features, easier to understand and adopt
+- **Simpler format**: Flat dependency list instead of nested structure
 - **Lightweight**: Single binary, no complex compilation step
 
-### Convergence Path
+### Format Comparison
 
-AIT is actively aligning with APM's manifest format (`apm.yml`) to ensure interoperability:
-
-**Current (AIT v0.3.x)**:
+**AIT Format (Simpler):**
 ```yaml
 name: my-project
 version: 1.0.0
 dependencies:
-  agents:
-    - github:org/repo/agents/code-reviewer
-  skills:
-    - github:org/repo/skills/python
+  - org/repo/agents/code-reviewer          # Flat list
+  - org/repo/skills/python
+  - gitlab.com/myorg/packages/agents/helper
+  - org/repo/agents/reviewer.agent.md      # Virtual packages
 ```
 
-**Future (APM-compatible)**:
+**Microsoft APM Format:**
 ```yaml
 name: my-project
 version: 1.0.0
 dependencies:
-  apm:  # Unified dependency list
+  apm:  # Nested structure
     - org/repo/agents/code-reviewer
     - org/repo/skills/python
 ```
 
+Both formats support:
+- ✅ GitHub shorthand (`org/repo/path`)
+- ✅ FQDN for other hosts (`gitlab.com/...`)
+- ✅ Virtual packages (`.agent.md`, `.skill.md`, etc.)
+- ✅ Semantic versioning
+
+### Backward Compatibility
+
+AIT maintains backward compatibility with:
+- Legacy `github:org/repo` prefix format
+- Nested `agents/skills/prompts` structure
+- APM-style `dependencies.apm` format
+
+This allows gradual migration without breaking existing manifests.
+
 ### Why Both Projects Matter
 
 - **APM** - Microsoft-backed, comprehensive, enterprise-focused, deep GitHub integration
-- **AIT** - Community-driven, lightweight, multi-tool support, project-level focus
+- **AIT** - Community-driven, lightweight, multi-tool support, simpler format
 
-We believe in ecosystem standards and will continue aligning with APM's format while maintaining AIT's unique value proposition of project-native tool detection and multi-tool support.
+We believe in ecosystem standards and have aligned with APM's core concepts (GitHub shorthand, virtual packages, semantic versioning) while maintaining AIT's unique value proposition of project-native tool detection and multi-tool support.
 
 ## License
 

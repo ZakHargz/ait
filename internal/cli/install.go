@@ -21,18 +21,26 @@ Examples:
   # Install all dependencies from ait.yml
   ait install
 
-  # Install specific packages
+  # Install specific packages (GitHub shorthand - recommended)
+  ait install org/repo/agents/code-reviewer@1.0.0
+  ait install org/repo/skills/python@^2.0.0
+  ait install gitlab.com/org/repo/agents/helper
+
+  # Install with explicit prefixes (legacy format)
   ait install github:org/repo/agents/code-reviewer@1.0.0
-  ait install github:org/repo/skills/python@^2.0.0
+  ait install local:./path/to/package
 
-Package spec format:
-  type:path@version
+Package spec formats:
+  Shorthand (recommended):
+    org/repo/path@version                    # Defaults to GitHub
+    gitlab.com/org/repo/path@version         # Other hosts (use FQDN)
+    ./path/to/package                        # Local path
 
-Supported types:
-  - github: GitHub repositories (github:org/repo/path@version)
-  - gitlab: GitLab repositories (gitlab:org/repo/path@version)
-  - git: Generic git repositories (git:https://git.example.com/repo@version)
-  - local: Local filesystem (local:./path/to/package@version)
+  Legacy (with prefix):
+    github:org/repo/path@version
+    gitlab:org/repo/path@version
+    git:https://git.example.com/repo@version
+    local:./path/to/package@version
 
 Version formats:
   - Exact: 1.0.0
@@ -82,11 +90,8 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to load ait.yml: %w", err)
 		}
 
-		// Collect all dependencies
-		specsToInstall = append(specsToInstall, manifest.Dependencies.Agents...)
-		specsToInstall = append(specsToInstall, manifest.Dependencies.Skills...)
-		specsToInstall = append(specsToInstall, manifest.Dependencies.Prompts...)
-		specsToInstall = append(specsToInstall, manifest.Dependencies.MCP...)
+		// Collect all dependencies (now a simple flat list)
+		specsToInstall = append(specsToInstall, manifest.Dependencies...)
 
 		if len(specsToInstall) == 0 {
 			utils.PrintWarning("No dependencies found in ait.yml")

@@ -25,13 +25,58 @@ type PackageMetadata struct {
 	Description   string            `yaml:"description"`
 	Author        Author            `yaml:"author,omitempty"`
 	License       string            `yaml:"license,omitempty"`
-	Dependencies  Dependencies      `yaml:"dependencies,omitempty"`
+	Dependencies  []string          `yaml:"dependencies,omitempty"`
 	Compatibility []string          `yaml:"compatibility"`
 	Files         map[string]string `yaml:"files"`
 	Tags          []string          `yaml:"tags,omitempty"`
 	Keywords      []string          `yaml:"keywords,omitempty"`
 	Requires      Requirements      `yaml:"requires,omitempty"`
 	Repository    Repository        `yaml:"repository,omitempty"`
+}
+
+// UnmarshalYAML implements custom YAML unmarshaling to support both
+// the new flat list format and legacy nested formats for dependencies
+func (p *PackageMetadata) UnmarshalYAML(node *yaml.Node) error {
+	// Create a temporary struct to decode into
+	type rawPackageMetadata struct {
+		Name          string            `yaml:"name"`
+		Version       string            `yaml:"version"`
+		Type          PackageType       `yaml:"type"`
+		Description   string            `yaml:"description"`
+		Author        Author            `yaml:"author,omitempty"`
+		License       string            `yaml:"license,omitempty"`
+		Dependencies  yaml.Node         `yaml:"dependencies,omitempty"`
+		Compatibility []string          `yaml:"compatibility"`
+		Files         map[string]string `yaml:"files"`
+		Tags          []string          `yaml:"tags,omitempty"`
+		Keywords      []string          `yaml:"keywords,omitempty"`
+		Requires      Requirements      `yaml:"requires,omitempty"`
+		Repository    Repository        `yaml:"repository,omitempty"`
+	}
+
+	var raw rawPackageMetadata
+	if err := node.Decode(&raw); err != nil {
+		return err
+	}
+
+	// Copy all fields
+	p.Name = raw.Name
+	p.Version = raw.Version
+	p.Type = raw.Type
+	p.Description = raw.Description
+	p.Author = raw.Author
+	p.License = raw.License
+	p.Compatibility = raw.Compatibility
+	p.Files = raw.Files
+	p.Tags = raw.Tags
+	p.Keywords = raw.Keywords
+	p.Requires = raw.Requires
+	p.Repository = raw.Repository
+
+	// Parse dependencies - support both flat list and nested formats
+	p.Dependencies = parseDependencies(&raw.Dependencies)
+
+	return nil
 }
 
 // Author represents package author information

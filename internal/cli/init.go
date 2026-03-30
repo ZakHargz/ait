@@ -79,14 +79,10 @@ func createDefaultManifest() *config.Manifest {
 	}
 
 	return &config.Manifest{
-		Name:    name,
-		Version: initVersion,
-		Dependencies: config.Dependencies{
-			Agents:  []string{},
-			Skills:  []string{},
-			Prompts: []string{},
-		},
-		Targets: []string{},
+		Name:         name,
+		Version:      initVersion,
+		Dependencies: []string{},
+		Targets:      []string{},
 	}
 }
 
@@ -113,15 +109,11 @@ func promptForManifest() *config.Manifest {
 	targets := []string{}
 
 	manifest := &config.Manifest{
-		Name:        name,
-		Version:     version,
-		Description: description,
-		Dependencies: config.Dependencies{
-			Agents:  []string{},
-			Skills:  []string{},
-			Prompts: []string{},
-		},
-		Targets: targets,
+		Name:         name,
+		Version:      version,
+		Description:  description,
+		Dependencies: []string{},
+		Targets:      targets,
 	}
 
 	return manifest

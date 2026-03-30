@@ -48,12 +48,8 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load ait.yml: %w", err)
 	}
 
-	// Collect all dependencies
-	allDeps := []string{}
-	allDeps = append(allDeps, manifest.Dependencies.Agents...)
-	allDeps = append(allDeps, manifest.Dependencies.Skills...)
-	allDeps = append(allDeps, manifest.Dependencies.Prompts...)
-	allDeps = append(allDeps, manifest.Dependencies.MCP...)
+	// Get all dependencies (now a simple flat list)
+	allDeps := manifest.Dependencies
 
 	if len(allDeps) == 0 {
 		utils.PrintWarning("No dependencies found in ait.yml")

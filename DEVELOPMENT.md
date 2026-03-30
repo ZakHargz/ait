@@ -180,11 +180,10 @@ github.com/Masterminds/semver/v3     // Semantic versioning
 name: my-project
 version: 1.0.0
 dependencies:
-  agents:
-    - local:~/packages/agents/code-reviewer@1.0.0
-    - github:org/repo/agents/reviewer@^1.2.0
-  skills:
-    - github:org/repo/skills/python@~2.0.0
+  - org/repo/agents/code-reviewer@1.0.0      # GitHub shorthand
+  - org/repo/skills/python@^2.0.0            # Version constraints
+  - gitlab.com/org/repo/agents/helper        # Other Git hosts
+  - ./local-packages/custom-agent            # Local paths
 targets:
   - opencode
 ```
@@ -206,6 +205,8 @@ compatibility:
 files:
   opencode: AGENT.md
   cursor: AGENT.md
+dependencies:
+  - org/repo/skills/git-workflow@^1.0.0
 tags:
   - code-review
   - quality
@@ -220,7 +221,7 @@ packages:
     name: code-reviewer
     version: 1.0.0
     type: agent
-    source: local:~/packages/agents/code-reviewer@1.0.0
+    source: org/repo/agents/code-reviewer@1.0.0
     resolved: 1.0.0
     installed:
       - opencode

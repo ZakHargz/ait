@@ -71,33 +71,17 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	// Build manifest
 	manifest := &config.Manifest{
-		Name:    projectName,
-		Version: "1.0.0",
-		Targets: []string{"project"}, // Default to project-local
-		Dependencies: config.Dependencies{
-			Agents:  []string{},
-			Skills:  []string{},
-			Prompts: []string{},
-			MCP:     []string{},
-		},
+		Name:         projectName,
+		Version:      "1.0.0",
+		Targets:      []string{"project"}, // Default to project-local
+		Dependencies: []string{},
 	}
 
-	// Group packages by type
+	// Add all packages to flat dependency list
 	for _, pkg := range packages {
 		// Create a local reference since packages are already in .ait/
 		spec := fmt.Sprintf("local:.ait/%s/%s@1.0.0", getTypeDir(string(pkg.Type)), pkg.Name)
-
-		switch pkg.Type {
-		case "agent":
-			manifest.Dependencies.Agents = append(manifest.Dependencies.Agents, spec)
-		case "skill":
-			manifest.Dependencies.Skills = append(manifest.Dependencies.Skills, spec)
-		case "prompt":
-			manifest.Dependencies.Prompts = append(manifest.Dependencies.Prompts, spec)
-		case "mcp":
-			manifest.Dependencies.MCP = append(manifest.Dependencies.MCP, spec)
-		}
-
+		manifest.Dependencies = append(manifest.Dependencies, spec)
 		utils.PrintInfo(fmt.Sprintf("  • %s [%s]", pkg.Name, pkg.Type))
 	}
 
