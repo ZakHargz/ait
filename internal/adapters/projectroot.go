@@ -11,7 +11,13 @@ import (
 )
 
 // ProjectRootAdapter installs packages using tool-native project-level conventions
-// This adapter creates files that AI tools automatically detect (e.g., .cursorrules, .github/copilot-instructions.md)
+// This adapter creates files that AI tools automatically detect following APM standards:
+// - .github/agents/*.agent.md (GitHub Copilot, VS Code, IntelliJ)
+// - .github/prompts/*.prompt.md (VS Code prompt files)
+// - .github/instructions/*.instructions.md (Path-specific instructions)
+// - .github/copilot-instructions.md (Repository-wide instructions)
+// - .cursorrules (Cursor)
+// - .opencode/agents/ (OpenCode)
 type ProjectRootAdapter struct {
 	BaseAdapter
 	projectRoot string
@@ -40,8 +46,8 @@ func (a *ProjectRootAdapter) GetConfigDir() (string, error) {
 // InstallAgent installs an agent using tool-native conventions
 // Creates:
 // - .cursorrules (for Cursor)
-// - .github/copilot-instructions.md (for GitHub Copilot)
-// - .opencode/agents/<name>/ (for OpenCode, if they support it)
+// - .github/agents/<name>.agent.md (for GitHub Copilot, VS Code, IntelliJ - APM standard)
+// - .opencode/agents/<name>/ (for OpenCode)
 func (a *ProjectRootAdapter) InstallAgent(pkg *packages.Package) error {
 	// Read AGENT.md content
 	agentFile := filepath.Join(pkg.Path, "AGENT.md")
@@ -57,9 +63,9 @@ func (a *ProjectRootAdapter) InstallAgent(pkg *packages.Package) error {
 		utils.PrintWarning(fmt.Sprintf("Failed to create .cursorrules: %s", err.Error()))
 	}
 
-	// 2. Install for GitHub Copilot (.github/copilot-instructions.md)
-	if err := a.installGitHubCopilot(pkg, agentContent); err != nil {
-		utils.PrintWarning(fmt.Sprintf("Failed to create .github/copilot-instructions.md: %s", err.Error()))
+	// 2. Install for GitHub Copilot (.github/agents/<name>.agent.md)
+	if err := a.installGitHubCopilotAgent(pkg, agentContent); err != nil {
+		utils.PrintWarning(fmt.Sprintf("Failed to create .github/agents/%s.agent.md: %s", pkg.Name, err.Error()))
 	}
 
 	// 3. Install for OpenCode (proposed .opencode/agents/ convention)
@@ -69,7 +75,7 @@ func (a *ProjectRootAdapter) InstallAgent(pkg *packages.Package) error {
 
 	utils.PrintSuccess("Created project-level agent files:")
 	utils.PrintInfo("  • .cursorrules (Cursor auto-detects)")
-	utils.PrintInfo("  • .github/copilot-instructions.md (GitHub Copilot auto-detects)")
+	utils.PrintInfo("  • .github/agents/%s.agent.md (GitHub Copilot, VS Code, IntelliJ)", pkg.Name)
 	utils.PrintInfo("  • .opencode/agents/ (OpenCode may support in future)")
 
 	return nil
@@ -97,27 +103,30 @@ func (a *ProjectRootAdapter) installCursorRules(pkg *packages.Package, agentCont
 	return nil
 }
 
-// installGitHubCopilot creates .github/copilot-instructions.md for GitHub Copilot
-func (a *ProjectRootAdapter) installGitHubCopilot(pkg *packages.Package, agentContent string) error {
-	githubDir := filepath.Join(a.projectRoot, ".github")
-	if err := utils.EnsureDir(githubDir); err != nil {
-		return fmt.Errorf("failed to create .github directory: %w", err)
+// installGitHubCopilotAgent creates .github/agents/<name>.agent.md for GitHub Copilot
+// Following APM standard: https://microsoft.github.io/apm/integrations/ide-tool-integration/
+func (a *ProjectRootAdapter) installGitHubCopilotAgent(pkg *packages.Package, agentContent string) error {
+	githubAgentsDir := filepath.Join(a.projectRoot, ".github", "agents")
+	if err := utils.EnsureDir(githubAgentsDir); err != nil {
+		return fmt.Errorf("failed to create .github/agents directory: %w", err)
 	}
 
-	copilotPath := filepath.Join(githubDir, "copilot-instructions.md")
+	agentPath := filepath.Join(githubAgentsDir, pkg.Name+".agent.md")
 
-	// Convert AGENT.md to GitHub Copilot format
-	copilotContent := convertToGitHubCopilot(pkg.Name, agentContent)
+	// Strip YAML frontmatter and use clean content
+	cleanContent := stripYAMLFrontmatter(agentContent)
+
+	// Add metadata header for tracking
+	header := fmt.Sprintf("<!-- AIT Package: %s -->\n", pkg.Name)
+	finalContent := header + cleanContent
 
 	// Check if file already exists
-	if _, err := os.Stat(copilotPath); err == nil {
-		utils.PrintWarning(".github/copilot-instructions.md already exists, appending agent")
-		existing, _ := os.ReadFile(copilotPath)
-		copilotContent = string(existing) + "\n\n---\n\n" + copilotContent
+	if _, err := os.Stat(agentPath); err == nil {
+		utils.PrintWarning(".github/agents/%s.agent.md already exists, overwriting", pkg.Name)
 	}
 
-	if err := os.WriteFile(copilotPath, []byte(copilotContent), 0644); err != nil {
-		return fmt.Errorf("failed to write copilot-instructions.md: %w", err)
+	if err := os.WriteFile(agentPath, []byte(finalContent), 0644); err != nil {
+		return fmt.Errorf("failed to write .github/agents/%s.agent.md: %w", pkg.Name, err)
 	}
 
 	return nil
@@ -298,19 +307,6 @@ func convertAgentToCursorRules(name string, content string) string {
 	header := fmt.Sprintf("# Cursor Rules: %s\n\n", name)
 
 	footer := "\n\n---\nGenerated by AIT (AI Toolkit Package Manager)"
-
-	return header + content + footer
-}
-
-// convertToGitHubCopilot converts AGENT.md content to GitHub Copilot format
-func convertToGitHubCopilot(name string, content string) string {
-	// Strip YAML frontmatter if present
-	content = stripYAMLFrontmatter(content)
-
-	// Add GitHub Copilot-specific header
-	header := fmt.Sprintf("# GitHub Copilot Instructions: %s\n\n", name)
-
-	footer := "\n\n---\n*Generated by AIT (AI Toolkit Package Manager)*"
 
 	return header + content + footer
 }

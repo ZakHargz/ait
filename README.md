@@ -162,7 +162,7 @@ ait install --target opencode org/repo/agents/reviewer
 
 This creates tool-native files at your project root:
 - `.cursorrules` - Auto-detected by Cursor
-- `.github/copilot-instructions.md` - Auto-detected by GitHub Copilot
+- `.github/agents/*.agent.md` - Auto-detected by GitHub Copilot, VS Code, IntelliJ (APM standard)
 - `.opencode/agents/` - For OpenCode (proposed standard)
 
 **Team Workflow**: Commit these files to git! Your team gets AI agents automatically when they clone the repo - no `ait` commands needed.
@@ -595,9 +595,9 @@ Useful for:
 ### GitHub Copilot ✅
 
 - **Status**: Fully supported with project-level detection
-- **Project-Level**: `.github/copilot-instructions.md` (auto-detected by GitHub Copilot)
-- **Format**: Converts AGENT.md to Copilot instructions format
-- **Auto-Detection**: ✅ Yes - GitHub Copilot automatically loads project-level instructions
+- **Project-Level**: `.github/agents/<name>.agent.md` (auto-detected by GitHub Copilot, VS Code, IntelliJ)
+- **Format**: Native `.agent.md` format (APM standard)
+- **Auto-Detection**: ✅ Yes - GitHub Copilot automatically loads agents from `.github/agents/`
 
 ### OpenCode ✅
 
@@ -622,7 +622,7 @@ Useful for:
 
 **Summary of Project-Level Support:**
 - ✅ **Cursor** - Full auto-detection via `.cursorrules`
-- ✅ **GitHub Copilot** - Full auto-detection via `.github/copilot-instructions.md`
+- ✅ **GitHub Copilot** - Full auto-detection via `.github/agents/*.agent.md` (APM standard)
 - ⚠️ **OpenCode** - Project files created, use `ait sync` for global
 - ❌ **Claude Desktop** - Global installation only
 
@@ -641,7 +641,7 @@ Useful for:
 - `ait sync` command - Sync project packages to global tools
 - **Project-Level Installation** - Tool-native file generation:
   - `.cursorrules` for Cursor (auto-detected)
-  - `.github/copilot-instructions.md` for GitHub Copilot (auto-detected)
+  - `.github/agents/*.agent.md` for GitHub Copilot, VS Code, IntelliJ (APM standard)
   - `.opencode/agents/` for OpenCode (proposed standard)
 - **Global Installation** - Install to AI tools' global directories
 - OpenCode adapter (agents, skills, prompts)

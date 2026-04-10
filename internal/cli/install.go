@@ -296,7 +296,7 @@ func getProjectLocalAdapters() (map[string]adapters.Adapter, error) {
 
 	utils.PrintInfo("Installing to project root using tool-native conventions:")
 	utils.PrintInfo("  • .cursorrules (Cursor auto-detects)")
-	utils.PrintInfo("  • .github/copilot-instructions.md (GitHub Copilot auto-detects)")
+	utils.PrintInfo("  • .github/agents/*.agent.md (GitHub Copilot, VS Code, IntelliJ)")
 	utils.PrintInfo("  • .opencode/ (proposed for OpenCode)")
 	utils.PrintInfo("💡 Tip: Commit these files to git for team sharing!")
 	utils.PrintInfo("💡 Tip: Use --global flag to install to AI tools globally")
