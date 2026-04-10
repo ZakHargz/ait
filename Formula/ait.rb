@@ -4,8 +4,8 @@
 class Ait < Formula
   desc "AI Toolkit Package Manager - npm for AI agents, skills, and prompts"
   homepage "https://github.com/ZakHargz/ait"
-  url "https://github.com/ZakHargz/ait/archive/refs/tags/v0.7.0.tar.gz"
-  sha256 "fd8ad2cb1ac5b7830198f2d1de0c0b3b9a1838aad47d12e2e4ba5c469a685acb"
+  url "https://github.com/ZakHargz/ait/archive/refs/tags/v0.8.0.tar.gz"
+  sha256 "b944ed85a9ccef93403de28ad859105ad10fa0faa5fa68ae4109feccd71fe1c6"
   license "MIT"
   head "https://github.com/ZakHargz/ait.git", branch: "main"
 
@@ -26,5 +26,8 @@ class Ait < Formula
     ait_yml = File.read(testpath/"ait.yml")
     assert_match "name:", ait_yml
     assert_match "version:", ait_yml
+    
+    # Test doctor command
+    system bin/"ait", "doctor"
   end
 end
