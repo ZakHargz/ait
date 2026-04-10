@@ -161,23 +161,47 @@ func checkPackageVersion(pkg config.LockedPkg, gitSource *sources.GitSource) Pac
 
 // getLatestVersion gets the latest version available for a package
 func getLatestVersion(spec *sources.PackageSpec, gitSource *sources.GitSource) (string, error) {
-	// Build a temporary spec with "latest-tag" version to get the newest tag
-	tempSpec := *spec
-	tempSpec.Version = "latest-tag"
-
-	// Fetch the package to trigger repository update and version resolution
-	// We don't need the actual package, just the version resolution
+	// Build repository URL and cache path
 	repoURL := buildRepoURL(spec)
 	repoPath := getRepoCachePath(spec, gitSource.CacheDir)
 
-	// Ensure the repository is up-to-date
-	repo, err := ensureRepo(gitSource, repoURL, repoPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch repository: %w", err)
+	// Open or clone the repository
+	var repo *git.Repository
+	var err error
+
+	if utils.DirExists(repoPath) {
+		// Open existing repository
+		repo, err = git.PlainOpen(repoPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to open repository: %w", err)
+		}
+
+		// Fetch latest changes (ignore if already up to date)
+		err = repo.Fetch(&git.FetchOptions{
+			RemoteName: "origin",
+			Force:      true,
+			Tags:       git.AllTags,
+		})
+		if err != nil && err != git.NoErrAlreadyUpToDate {
+			return "", fmt.Errorf("failed to fetch updates: %w", err)
+		}
+	} else {
+		// Clone repository
+		if err := utils.EnsureDir(filepath.Dir(repoPath)); err != nil {
+			return "", fmt.Errorf("failed to create cache directory: %w", err)
+		}
+
+		repo, err = git.PlainClone(repoPath, false, &git.CloneOptions{
+			URL:  repoURL,
+			Tags: git.AllTags,
+		})
+		if err != nil {
+			return "", fmt.Errorf("failed to clone repository: %w", err)
+		}
 	}
 
-	// Get all tags and find the latest semver tag
-	tags, err := getTags(repo)
+	// Get all tags
+	tagRefs, err := repo.Tags()
 	if err != nil {
 		return "", fmt.Errorf("failed to get tags: %w", err)
 	}
@@ -186,18 +210,25 @@ func getLatestVersion(spec *sources.PackageSpec, gitSource *sources.GitSource) (
 	var latestVersion *semver.Version
 	var latestTag string
 
-	for _, tag := range tags {
+	err = tagRefs.ForEach(func(ref *plumbing.Reference) error {
+		tag := ref.Name().Short()
+
 		// Try to parse tag as semver (strip 'v' prefix if present)
 		tagName := strings.TrimPrefix(tag, "v")
 		v, err := semver.NewVersion(tagName)
 		if err != nil {
-			continue // Skip non-semver tags
+			return nil // Skip non-semver tags
 		}
 
 		if latestVersion == nil || v.GreaterThan(latestVersion) {
 			latestVersion = v
 			latestTag = tag
 		}
+		return nil
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("failed to iterate tags: %w", err)
 	}
 
 	if latestVersion != nil {
@@ -208,9 +239,7 @@ func getLatestVersion(spec *sources.PackageSpec, gitSource *sources.GitSource) (
 	return "latest", nil
 }
 
-// Helper functions to access git source internals
-// These mirror the private methods in git.go
-
+// buildRepoURL constructs the git repository URL from the package spec
 func buildRepoURL(spec *sources.PackageSpec) string {
 	switch spec.Type {
 	case "github":
@@ -224,67 +253,10 @@ func buildRepoURL(spec *sources.PackageSpec) string {
 	}
 }
 
+// getRepoCachePath returns the cache directory path for a repository
 func getRepoCachePath(spec *sources.PackageSpec, cacheDir string) string {
 	safeName := strings.ReplaceAll(spec.Repo, "/", "_")
 	return filepath.Join(cacheDir, spec.Type, safeName)
-}
-
-func ensureRepo(gitSource *sources.GitSource, repoURL, repoPath string) (*git.Repository, error) {
-	// Create a temporary spec to use the GitSource.Fetch method
-	// This will handle cloning/updating the repository
-	spec := &sources.PackageSpec{
-		Type:    "github",
-		Repo:    extractRepoFromURL(repoURL),
-		Path:    "",
-		Version: "latest-tag",
-	}
-
-	// Detect source type from URL
-	if strings.Contains(repoURL, "gitlab.com") {
-		spec.Type = "gitlab"
-	} else if !strings.Contains(repoURL, "github.com") {
-		spec.Type = "git"
-	}
-
-	// Use the internal method by creating a package fetch
-	// This will ensure the repo exists and is up-to-date
-	if utils.DirExists(repoPath) {
-		// Repository exists, just open it
-		repo, err := openRepo(repoPath)
-		if err != nil {
-			return nil, err
-		}
-		// Fetch updates
-		err = fetchRepo(repo, gitSource)
-		if err != nil {
-			return nil, err
-		}
-		return repo, nil
-	}
-
-	// Clone the repository
-	return cloneRepo(repoURL, repoPath, gitSource)
-}
-
-func extractRepoFromURL(repoURL string) string {
-	// Remove .git suffix
-	repoURL = strings.TrimSuffix(repoURL, ".git")
-
-	// Extract org/repo from URL
-	if strings.Contains(repoURL, "github.com/") {
-		parts := strings.Split(repoURL, "github.com/")
-		if len(parts) > 1 {
-			return parts[1]
-		}
-	}
-	if strings.Contains(repoURL, "gitlab.com/") {
-		parts := strings.Split(repoURL, "gitlab.com/")
-		if len(parts) > 1 {
-			return parts[1]
-		}
-	}
-
-	return repoURL
 }
 
 // displayOutdatedPackages displays the results in a formatted table
@@ -387,49 +359,4 @@ func displayOutdatedPackages(infos []PackageVersionInfo) error {
 	}
 
 	return nil
-}
-
-// Wrappers for git operations - these will use go-git directly
-// to avoid circular dependencies
-
-func openRepo(path string) (*git.Repository, error) {
-	return git.PlainOpen(path)
-}
-
-func fetchRepo(repo *git.Repository, gitSource *sources.GitSource) error {
-	err := repo.Fetch(&git.FetchOptions{
-		RemoteName: "origin",
-		Force:      true,
-		Tags:       git.AllTags,
-	})
-	if err != nil && err != git.NoErrAlreadyUpToDate {
-		return err
-	}
-	return nil
-}
-
-func cloneRepo(repoURL, repoPath string, gitSource *sources.GitSource) (*git.Repository, error) {
-	if err := utils.EnsureDir(filepath.Dir(repoPath)); err != nil {
-		return nil, err
-	}
-
-	return git.PlainClone(repoPath, false, &git.CloneOptions{
-		URL:  repoURL,
-		Tags: git.AllTags,
-	})
-}
-
-func getTags(repo *git.Repository) ([]string, error) {
-	tags, err := repo.Tags()
-	if err != nil {
-		return nil, err
-	}
-
-	var tagNames []string
-	err = tags.ForEach(func(ref *plumbing.Reference) error {
-		tagNames = append(tagNames, ref.Name().Short())
-		return nil
-	})
-
-	return tagNames, err
 }
