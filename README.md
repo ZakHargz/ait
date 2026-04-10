@@ -1,25 +1,222 @@
 # AIT - AI Toolkit Package Manager
 
-A CLI package manager for AI agents, skills, prompts, and MCP servers. Think npm/pip for AI tooling across OpenCode, Cursor, Claude Desktop, and more.
+> **npm for AI agents, skills, and prompts** - Manage AI tooling across OpenCode, Cursor, Claude Desktop, and GitHub Copilot with a single command.
 
-> **🔄 Aligning with Standards**: AIT is actively aligning with [Microsoft's Agent Package Manager (APM)](https://microsoft.github.io/apm/) format and ecosystem standards including [AGENTS.md](https://agents.md), [Agent Skills](https://agentskills.io), and [Model Context Protocol (MCP)](https://modelcontextprotocol.io). This ensures maximum compatibility and interoperability across AI development tools.
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](https://github.com/ZakHargz/ait/releases)
+[![Tests](https://img.shields.io/badge/tests-95%20passing-brightgreen.svg)](https://github.com/ZakHargz/ait/actions)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+**AIT** is a CLI package manager that brings the npm/pip experience to AI development. Define your AI agents, skills, and prompts in `ait.yml`, and AIT handles installation, versioning, and synchronization across all your AI tools.
+
+> **🔄 Aligning with Standards**: AIT actively aligns with [Microsoft's Agent Package Manager (APM)](https://microsoft.github.io/apm/), [AGENTS.md](https://agents.md), [Agent Skills](https://agentskills.io), and [Model Context Protocol (MCP)](https://modelcontextprotocol.io) for maximum compatibility across the AI ecosystem.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Getting Started Guide](#getting-started-guide)
+- [How It Works](#how-it-works)
+- [Commands Reference](#commands-reference)
+- [Creating an AI Marketplace Monorepo](#creating-an-ai-marketplace-monorepo)
+- [Developer Setup](#developer-setup)
+- [Use Cases](#use-cases)
+- [Supported AI Tools](#supported-ai-tools)
+- [Package Format](#package-format)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+
+---
 
 ## Features
 
-- 📦 **Declarative Dependencies** - Define AI tools in `ait.yml`
-- 🚀 **Project-Level Installation** - Install to tool-native paths (`.cursorrules`, `.github/copilot-instructions.md`) for automatic detection
-- 🔄 **Multi-Tool Sync** - Install to OpenCode, Cursor, Claude Desktop, GitHub Copilot simultaneously
-- 👥 **Team Sharing** - Commit tool-native files to git for instant team collaboration
+### Core Capabilities
+
+- 📦 **Declarative Dependencies** - Define all AI tools in one `ait.yml` file
+- 🚀 **Project-Level Installation** - Auto-detected by AI tools (no manual setup)
+- 🔄 **Multi-Tool Sync** - Install to OpenCode, Cursor, Claude, GitHub Copilot simultaneously
+- 👥 **Team Sharing** - Commit native files to git for zero-config team collaboration
 - 🌲 **Dependency Resolution** - Automatic transitive dependency handling
 - 📌 **Lock Files** - Reproducible installations with `ait.lock`
-- 🏷️ **Semantic Versioning** - Optional version constraints (`^1.0.0`, `~2.1.0`, or omit for latest)
+- 🏷️ **Semantic Versioning** - Version constraints (`^1.0.0`, `~2.1.0`, or latest)
 - 🌍 **Multiple Sources** - GitHub, GitLab, generic Git, or local packages
-- 🔐 **Private Repository Support** - Authenticate with GitHub tokens for private packages ([docs](docs/AUTHENTICATION.md))
-- 💾 **Smart Caching** - Local cache to speed up installations
+- 🔐 **Private Repositories** - GitHub token authentication support
+- 💾 **Smart Caching** - Faster installations with local cache
+
+### Developer Experience
+
+- 🩺 **Health Checks** - `ait doctor` validates your setup
+- 📊 **Update Detection** - `ait outdated` shows available updates
+- 🔍 **Package Discovery** - List installed packages across all tools
+- 🛠️ **Developer Friendly** - Built in Go, comprehensive tests, CI/CD ready
+
+---
+
+## Architecture
+
+### System Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        AIT Package Manager                       │
+│                                                                   │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │   ait.yml    │───▶│     CLI      │───▶│   ait.lock   │      │
+│  │  (Manifest)  │    │   Commands   │    │  (Lockfile)  │      │
+│  └──────────────┘    └──────┬───────┘    └──────────────┘      │
+│                              │                                    │
+│                    ┌─────────┼─────────┐                         │
+│                    │         │         │                         │
+│              ┌─────▼───┐ ┌──▼────┐ ┌──▼────┐                   │
+│              │ Sources │ │Resolver│ │Adapters│                  │
+│              │ Package │ │ Deps   │ │ Tools  │                  │
+│              └─────┬───┘ └───────┘ └───┬────┘                   │
+│                    │                     │                        │
+└────────────────────┼─────────────────────┼────────────────────────┘
+                     │                     │
+         ┌───────────▼──────────┐   ┌─────▼──────────────────────┐
+         │   Remote Sources     │   │   AI Tool Installations    │
+         │                      │   │                            │
+         │  • GitHub repos      │   │  • .cursorrules (Cursor)   │
+         │  • GitLab repos      │   │  • .github/agents/         │
+         │  • Git repositories  │   │    (GitHub Copilot)        │
+         │  • Local packages    │   │  • .opencode/ (OpenCode)   │
+         │                      │   │  • ~/.claude/ (Claude)     │
+         └──────────────────────┘   └────────────────────────────┘
+```
+
+### Component Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Internal Components                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  CLI Layer (cmd/ait/, internal/cli/)                            │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ init │ install │ list │ update │ uninstall │ sync │        │ │
+│  │ doctor │ outdated │ generate                                │ │
+│  └───────────────────────────┬────────────────────────────────┘ │
+│                              │                                    │
+│  Core Logic                  │                                    │
+│  ┌───────────────────────────▼────────────────────────────────┐ │
+│  │                                                             │ │
+│  │  Config (internal/config/)                                 │ │
+│  │  ├─ Manifest (ait.yml parser)                             │ │
+│  │  ├─ Lockfile (ait.lock handler)                           │ │
+│  │  └─ Package Metadata (package.yml)                        │ │
+│  │                                                             │ │
+│  │  Resolver (internal/resolver/)                             │ │
+│  │  ├─ Dependency graph builder                              │ │
+│  │  ├─ Version constraint solver                             │ │
+│  │  └─ Transitive dependency handler                         │ │
+│  │                                                             │ │
+│  │  Sources (internal/sources/)                               │ │
+│  │  ├─ GitSource (clone, fetch, checkout)                    │ │
+│  │  ├─ LocalSource (filesystem packages)                     │ │
+│  │  ├─ Auth (GitHub token handling)                          │ │
+│  │  └─ Package spec parser                                   │ │
+│  │                                                             │ │
+│  │  Adapters (internal/adapters/)                             │ │
+│  │  ├─ BaseAdapter (shared install/uninstall logic)          │ │
+│  │  ├─ OpenCodeAdapter (~/.config/opencode)                  │ │
+│  │  ├─ CursorAdapter (~/Library/.../Cursor)                  │ │
+│  │  ├─ ClaudeAdapter (~/.claude)                             │ │
+│  │  └─ ProjectRootAdapter (.cursorrules, .github/agents/)    │ │
+│  │                                                             │ │
+│  │  Packages (internal/packages/)                             │ │
+│  │  └─ Package types (Agent, Skill, Prompt, MCP)             │ │
+│  │                                                             │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                   │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow
+
+```
+1. User runs: ait install org/repo/agents/reviewer@1.0.0
+                              │
+                              ▼
+2. CLI parses command ─────▶ install.go
+                              │
+                              ▼
+3. Load/create ait.yml ────▶ config.Manifest
+                              │
+                              ▼
+4. Parse package spec ─────▶ sources.ParsePackageSpec()
+   "org/repo/agents/reviewer@1.0.0"
+   ├─ Type: github
+   ├─ Repo: org/repo
+   ├─ Path: agents/reviewer
+   └─ Version: 1.0.0
+                              │
+                              ▼
+5. Resolve dependencies ───▶ resolver.Resolve()
+   ├─ Fetch from GitHub
+   ├─ Read package.yml
+   ├─ Resolve transitive deps
+   └─ Build dependency graph
+                              │
+                              ▼
+6. Fetch packages ─────────▶ sources.GitSource.Fetch()
+   ├─ Clone/update repository
+   ├─ Checkout version tag
+   └─ Return package metadata
+                              │
+                              ▼
+7. Install to targets ─────▶ adapters.Install()
+   ├─ ProjectRootAdapter:
+   │  ├─ .cursorrules
+   │  ├─ .github/agents/reviewer.agent.md
+   │  └─ .opencode/agents/reviewer/AGENT.md
+   └─ Or global adapters (OpenCode, Cursor, Claude)
+                              │
+                              ▼
+8. Update lockfile ────────▶ ait.lock (reproducible installs)
+                              │
+                              ▼
+9. Success! ✓
+```
+
+---
+
+## Quick Start
+
+### 5-Minute Setup
+
+```bash
+# 1. Install AIT
+brew tap zakhargz/ait
+brew install ait
+
+# 2. Verify installation
+ait --version
+
+# 3. Check your setup
+ait doctor
+
+# 4. Initialize a project
+mkdir my-ai-project && cd my-ai-project
+ait init --defaults
+
+# 5. Install an agent
+ait install apex-ai/agents/code-reviewer
+
+# 6. Verify installation
+ait list
+```
+
+**That's it!** Your AI agent is now available in Cursor, GitHub Copilot, and OpenCode.
+
+---
 
 ## Installation
 
-### Using Homebrew (macOS/Linux) - Recommended
+### Using Homebrew (Recommended)
 
 ```bash
 # Add the AIT tap
@@ -30,6 +227,7 @@ brew install ait
 
 # Verify installation
 ait --version
+# Output: ait version 0.8.0
 ```
 
 ### From Source
@@ -39,481 +237,332 @@ ait --version
 git clone https://github.com/ZakHargz/ait
 cd ait
 
-# Build and install globally
-go build -o /usr/local/bin/ait cmd/ait/main.go
+# Build
+make build
 
-# Or build without installing
-go build -o bin/ait cmd/ait/main.go
+# Install globally
+sudo cp bin/ait /usr/local/bin/
+
+# Or use locally
 ./bin/ait --version
 ```
 
-### Requirements
+### System Requirements
 
-- Go 1.26+ (for building from source only - not needed for Homebrew installation)
-- One or more AI tools: OpenCode, Cursor, Claude Desktop, or GitHub Copilot
+- **Go 1.23+** (for building from source only)
+- **Git** (required for package fetching)
+- **One or more AI tools**: OpenCode, Cursor, Claude Desktop, or GitHub Copilot
 
-## Quick Start
+---
 
-### 1. Initialize a Project
+## Getting Started Guide
+
+### For Individual Developers
+
+#### Step 1: Set Up Your Environment
 
 ```bash
-# Interactive initialization
+# Check if AIT is working
+ait doctor
+
+# Output shows:
+# ✓ Git installation: git version 2.53.0
+# ✓ AI tools detection: Found: [opencode cursor claude]
+# ✓ GitHub authentication: GitHub token configured
+```
+
+#### Step 2: Create Your First Project
+
+```bash
+# Create a new project directory
+mkdir my-coding-assistant
+cd my-coding-assistant
+
+# Initialize AIT
 ait init
 
-# Or use defaults
-ait init --defaults
+# This creates ait.yml:
+# name: my-coding-assistant
+# version: 1.0.0
+# dependencies: []
 ```
 
-This creates an `ait.yml` manifest:
-
-```yaml
-name: my-project
-version: 1.0.0
-dependencies: []
-targets:
-  - opencode
-```
-
-### 2. Authentication for Private Repositories (Optional)
-
-If you're using private GitHub repositories, set up authentication:
+#### Step 3: Install AI Agents
 
 ```bash
-# Use GitHub CLI (easiest)
-gh auth login
-export GH_TOKEN=$(gh auth token)
+# Install a code review agent
+ait install apex-ai/agents/code-reviewer
 
-# Or set a personal access token
-export GITHUB_TOKEN=ghp_your_token_here
+# Install a Python expert skill
+ait install apex-ai/skills/python
+
+# Install a debugging prompt
+ait install apex-ai/prompts/debug-helper
 ```
 
-For detailed authentication setup, see [Authentication Guide](docs/AUTHENTICATION.md).
+#### Step 4: Use Your AI Tools
 
-### 3. Add Dependencies
-
-Edit `ait.yml` to add packages as a simple flat list:
-
-```yaml
-name: my-project
-version: 1.0.0
-dependencies:
-  # GitHub shorthand (no prefix needed - defaults to GitHub)
-  - org/repo/agents/code-reviewer           # Latest version (recommended)
-  - org/repo/agents/test-generator@1.0.0    # Specific version
-  - org/repo/skills/python                  # Latest version
-  - org/repo/skills/docker@^2.0.0           # Version constraint (^, ~)
-  - org/repo/prompts/debug@~1.5.0
-  
-  # Virtual packages (single files)
-  - org/awesome/agents/reviewer.agent.md@1.0.0
-  - org/awesome/skills/python.skill.md
-  
-  # Other Git hosts (use FQDN)
-  - gitlab.com/myorg/packages/agents/helper
-  
-  # Local packages
-  - ./my-packages/custom-agent
-```
-
-**Pro Tip**: Omit `@version` to automatically get the latest version!
-
-<details>
-<summary><b>Legacy Format (still supported)</b></summary>
-
-The old format with separate `agents`, `skills`, and `prompts` lists is still supported for backward compatibility:
-
-```yaml
-dependencies:
-  agents:
-    - github:org/repo/agents/code-reviewer
-  skills:
-    - github:org/repo/skills/python
-  prompts:
-    - github:org/repo/prompts/debug
-```
-
-Note: The `github:` prefix is required in legacy format. We recommend migrating to the flat list format above.
-</details>
-
-### 4. Install Packages
+Open your project in **Cursor** or **GitHub Copilot**, and the agents are automatically loaded!
 
 ```bash
-# Install specific packages (automatically creates/updates ait.yml)
-ait install org/repo/agents/code-reviewer
-ait install org/repo/skills/python@^2.0.0
+# In Cursor, ask:
+# "Review this function for bugs"
 
-# Install all dependencies from ait.yml
+# The code-reviewer agent will provide expert feedback
+```
+
+### For Teams
+
+#### Step 1: Project Lead Sets Up
+
+```bash
+# Initialize the project
+cd your-team-project
+ait init
+
+# Add team agents to ait.yml
+cat > ait.yml << EOF
+name: team-project
+version: 1.0.0
+dependencies:
+  - apex-ai/agents/code-reviewer
+  - apex-ai/agents/test-generator
+  - apex-ai/skills/python
+  - apex-ai/skills/typescript
+  - apex-ai/prompts/pr-description
+EOF
+
+# Install everything
 ait install
 
-# Install without saving to ait.yml
-ait install org/repo/agents/reviewer --save=false
-
-# Install globally to AI tools instead
-ait install --global org/repo/agents/reviewer
-
-# Install to specific tools only
-ait install --target opencode org/repo/agents/reviewer
-```
-
-**New APM-like Behavior**: When you install a package from the command line, AIT automatically:
-1. Creates `ait.yml` if it doesn't exist (using current directory name as project name)
-2. Adds the package to the dependencies list
-3. Creates tool-native files at your project root
-
-This creates tool-native files at your project root:
-- `.cursorrules` - Auto-detected by Cursor
-- `.github/agents/*.agent.md` - Auto-detected by GitHub Copilot, VS Code, IntelliJ (APM standard)
-- `.opencode/agents/` - For OpenCode (proposed standard)
-
-**Team Workflow**: Commit these files to git! Your team gets AI agents automatically when they clone the repo - no `ait` commands needed.
-
-### 5. Share with Your Team (Optional)
-
-Commit the generated tool-native files to git:
-
-```bash
-git add .cursorrules .github/copilot-instructions.md .opencode/ ait.yml ait.lock
-git commit -m "Add AI agents for code review and testing"
+# Commit to git
+git add ait.yml ait.lock .cursorrules .github/ .opencode/
+git commit -m "Add AI development assistants"
 git push
 ```
 
-When teammates clone the repo:
-- **Cursor** auto-loads `.cursorrules` immediately
-- **GitHub Copilot** auto-loads `.github/copilot-instructions.md` immediately
-- **OpenCode** can load from `.opencode/agents/` (or run `ait sync` if needed)
-
-### 6. List Installed Packages
+#### Step 2: Team Members Clone and Go
 
 ```bash
-# List all installed packages
-ait list
+# Clone the repository
+git clone https://github.com/your-team/team-project
+cd team-project
 
-# List for specific tool
-ait list --target opencode
+# AI agents are already available!
+# Open in Cursor → agents load automatically
+# Open in VS Code with Copilot → agents load automatically
+
+# Optional: Install to personal AI tools
+ait sync
 ```
 
-### 7. Update Packages
+**No AIT commands needed!** The tool-native files (`.cursorrules`, `.github/agents/`) work automatically.
 
-```bash
-# Update all packages to latest compatible versions
-ait update
+---
 
-# Update specific packages
-ait update code-reviewer python-skill
+## How It Works
 
-# Update for specific tools only
-ait update --target opencode
+### The AIT Workflow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Developer Workflow                        │
+└─────────────────────────────────────────────────────────────┘
+
+1. DEFINE (ait.yml)
+   ┌─────────────────────────────────┐
+   │ name: my-project                │
+   │ version: 1.0.0                  │
+   │ dependencies:                   │
+   │   - org/repo/agents/reviewer    │
+   │   - org/repo/skills/python      │
+   └─────────────────────────────────┘
+                 │
+                 ▼
+2. INSTALL (ait install)
+   ┌─────────────────────────────────┐
+   │ • Fetch from remote repos       │
+   │ • Resolve dependencies          │
+   │ • Install to target paths       │
+   │ • Create ait.lock               │
+   └─────────────────────────────────┘
+                 │
+                 ▼
+3. TOOL-NATIVE FILES CREATED
+   ┌─────────────────────────────────┐
+   │ .cursorrules                    │
+   │ .github/agents/reviewer.agent.md│
+   │ .opencode/agents/reviewer/      │
+   └─────────────────────────────────┘
+                 │
+                 ▼
+4. AI TOOLS AUTO-DETECT
+   ┌─────────────────────────────────┐
+   │ ✓ Cursor loads .cursorrules     │
+   │ ✓ Copilot loads .github/agents/ │
+   │ ✓ OpenCode loads .opencode/     │
+   └─────────────────────────────────┘
+                 │
+                 ▼
+5. COMMIT TO GIT (team sharing)
+   ┌─────────────────────────────────┐
+   │ git add ait.yml .cursorrules    │
+   │ git commit -m "Add AI agents"   │
+   │ git push                        │
+   └─────────────────────────────────┘
+                 │
+                 ▼
+6. TEAM CLONES → WORKS IMMEDIATELY
+   ┌─────────────────────────────────┐
+   │ git clone → Open in tool → ✓   │
+   │ No ait commands needed!         │
+   └─────────────────────────────────┘
 ```
 
-### 8. Uninstall Packages
-
-```bash
-# Uninstall a package from project root
-ait uninstall code-reviewer
-
-# Uninstall from global tools
-ait uninstall code-reviewer --global
-
-# Uninstall from specific tools only
-ait uninstall code-reviewer --target cursor
-```
-
-## Installation Modes
+### Installation Modes
 
 AIT supports two installation modes:
 
-### Project-Level (Default) - Recommended for Teams
+#### 1. Project-Level (Default) - For Teams
 
-Install packages to tool-native paths at your project root for automatic detection:
+Installs packages to tool-native paths in your project root:
 
-```bash
-# Default: install to project root
-ait install github:org/repo/agents/code-reviewer
-
-# Creates these files:
-# .cursorrules                        (Cursor auto-detects)
-# .github/copilot-instructions.md     (GitHub Copilot auto-detects)
-# .opencode/agents/<name>/AGENT.md    (OpenCode - proposed standard)
+```
+your-project/
+├── ait.yml                          # Dependency manifest
+├── ait.lock                         # Version lock file
+├── .cursorrules                     # Cursor auto-loads this
+├── .github/
+│   └── agents/
+│       └── reviewer.agent.md        # Copilot auto-loads this
+└── .opencode/
+    └── agents/
+        └── reviewer/
+            └── AGENT.md             # OpenCode loads this
 ```
 
 **Benefits:**
-- ✅ AI tools automatically detect agents without manual configuration
-- ✅ Commit to git for instant team sharing
-- ✅ Version control your AI tooling alongside code
-- ✅ Clone and go - teammates get agents automatically
+- ✅ Auto-detected by AI tools (no config needed)
+- ✅ Commit to git for team sharing
+- ✅ Version controlled with your code
+- ✅ Works immediately when teammates clone
 
-**Best for:**
-- Team projects where everyone should have the same AI agents
-- Open source projects with contributor guidelines
-- Projects with specific domain expertise encoded in agents
+#### 2. Global Installation - For Personal Use
 
-### Global Installation - For Personal Use
-
-Install packages to each AI tool's global directory:
+Installs to your AI tools' config directories:
 
 ```bash
-# Install globally to all detected AI tools
-ait install --global github:org/repo/agents/code-reviewer
-
-# Installs to:
-# ~/.config/opencode/agents/<name>/AGENT.md
-# ~/Library/Application Support/Cursor/User/ait-agents/<name>/.cursorrules
-# ~/.claude/agents/<name>/AGENT.md
+ait install --global org/repo/agents/reviewer
 ```
+
+Installs to:
+- `~/.config/opencode/agents/` (OpenCode)
+- `~/Library/Application Support/Cursor/User/` (Cursor)
+- `~/.claude/` (Claude Desktop)
 
 **Benefits:**
-- ✅ Available across all your projects
-- ✅ Personal agents that don't need team sharing
-- ✅ Useful for tools without project-level detection
+- ✅ Available across all projects
+- ✅ Personal workspace customization
+- ✅ No project files created
 
-**Best for:**
-- Personal productivity agents
-- Agents you want available everywhere
-- Tools that don't support project-level detection (like Claude Desktop)
-
-## Package Specification Format
-
-Dependencies are specified as a simple flat list with GitHub shorthand by default:
-
-```yaml
-dependencies:
-  # GitHub (default, no prefix needed)
-  - org/repo/agents/code-reviewer@1.0.0
-  - org/repo/skills/python               # Latest version
-  
-  # Other Git hosts (use FQDN)
-  - gitlab.com/org/repo/agents/helper@2.0.0
-  - bitbucket.org/org/repo/skills/docker
-  
-  # Virtual packages (single files)
-  - org/repo/agents/reviewer.agent.md
-  - org/repo/skills/python.skill.md
-  - org/repo/prompts/debug.prompt.md
-  
-  # Local packages
-  - ./path/to/package
-  - ~/packages/agents/custom
-```
-
-**Virtual Packages**: Files ending in `.agent.md`, `.skill.md`, `.prompt.md`, `.instructions.md`, or `.chatmode.md` can be installed directly without requiring a `package.yml` file.
-
-### Legacy Format (Still Supported)
-
-The original format with explicit source type prefixes and nested structure:
-
-```yaml
-dependencies:
-  agents:
-    - github:org/repo/agents/code-reviewer@1.0.0
-  skills:
-    - gitlab:org/repo/skills/python@^2.0.0
-  prompts:
-    - local:./my-prompts/debug
-```
-
-**Supported source prefixes in legacy format:**
-- `github:org/repo/path/to/package@version` - GitHub repositories
-- `gitlab:org/repo/path/to/package@version` - GitLab repositories
-- `git:https://git.example.com/repo/path@version` - Generic Git URLs
-- `local:./path/to/package` - Local filesystem paths
-
-### Version Formats
-
-- **Exact**: `1.0.0` - Exact version only
-- **Caret**: `^1.0.0` - Compatible with 1.x.x (minor/patch updates)
-- **Tilde**: `~1.5.0` - Compatible with 1.5.x (patch updates only)
-- **Range**: `>=1.0.0 <2.0.0` - Version range
-- **Branch**: `main`, `develop` - Git branch names
-- **Commit**: `abc123...` - Specific commit hash
-
-## Creating Packages
-
-### Package Structure
-
-Each package needs a `package.yml` metadata file:
-
-```
-my-package/
-├── package.yml          # Required: Package metadata
-├── AGENT.md            # For agents
-├── SKILL.md            # For skills
-└── prompt.txt          # For prompts
-```
-
-### package.yml Format
-
-```yaml
-name: code-reviewer
-version: 1.0.0
-type: agent              # agent, skill, prompt, or mcp
-description: Expert code reviewer for best practices
-author:
-  name: Your Name
-  email: you@example.com
-license: MIT
-compatibility:
-  - opencode
-  - cursor
-  - claude
-files:
-  opencode: AGENT.md
-  cursor: AGENT.md
-  claude: AGENT.md
-dependencies:           # Optional: Package dependencies (flat list)
-  - org/repo/skills/git-workflow@^1.0.0
-tags:
-  - code-review
-  - quality
-```
-
-### Agent Format (AGENT.md)
-
-Agents use frontmatter for metadata:
-
-```markdown
 ---
-name: code-reviewer
-version: 1.0.0
-description: Expert code reviewer
----
-
-# Code Reviewer Agent
-
-You are an expert code reviewer...
-
-## Your Role
-...
-```
-
-### Skill Format (SKILL.md)
-
-Similar to agents:
-
-```markdown
----
-name: python
-version: 2.1.0
-description: Python development expertise
----
-
-# Python Development Skill
-
-## Core Competencies
-...
-```
-
-### Prompt Format
-
-Simple text files:
-
-```
-Please help me debug this issue:
-1. Analyze the error
-2. Identify root cause
-3. Suggest fixes
-```
-
-## Configuration Files
-
-### ait.yml (Project Manifest)
-
-```yaml
-name: my-project
-version: 1.0.0
-description: My AI-powered project
-
-dependencies:
-  - org/repo/agents/code-reviewer                    # Latest version (recommended)
-  - myorg/ai-toolkit/agents/custom-agent@~2.0.0      # Version constraint
-  - org/repo/skills/python                           # Latest version
-  - org/repo/agents/reviewer.agent.md                # Virtual package
-  - ./prompts/custom                                 # Local package
-  - org/repo/servers/custom-mcp@^1.0.0               # MCP server
-
-# Target AI tools
-targets:
-  - opencode
-  - cursor
-  - claude
-```
-
-### ait.lock (Lock File)
-
-Auto-generated on install:
-
-```yaml
-version: "1.0"
-generated: 2026-03-27T16:09:03Z
-packages:
-  code-reviewer:
-    name: code-reviewer
-    version: latest              # Requested version
-    type: agent
-    source: github:org/repo/agents/code-reviewer
-    resolved: 1.0.5             # Exact resolved version
-    installed:
-      - project-root            # or: opencode, cursor, claude
-```
 
 ## Commands Reference
 
-### ait init
+### `ait init`
 
-Initialize a new project with `ait.yml`:
+Initialize a new project with `ait.yml`.
 
 ```bash
-# Interactive mode
+# Interactive mode (prompts for details)
 ait init
 
-# Use defaults
+# Use defaults (name from directory)
 ait init --defaults
 
 # Specify project details
 ait init --name my-project --version 1.0.0
 ```
 
-### ait install
+**Creates:**
+```yaml
+name: my-project
+version: 1.0.0
+dependencies: []
+```
 
-Install packages:
+---
+
+### `ait install`
+
+Install packages from `ait.yml` or command line.
 
 ```bash
-# Install specific packages (auto-creates/updates ait.yml)
-ait install org/repo/agents/reviewer
-ait install org/repo/skills/python@^2.0.0
-
 # Install all dependencies from ait.yml
 ait install
+
+# Install specific packages (auto-adds to ait.yml)
+ait install org/repo/agents/code-reviewer
+ait install org/repo/skills/python@^2.0.0
 
 # Install without saving to ait.yml
 ait install org/repo/agents/reviewer --save=false
 
-# Install globally to AI tools
+# Install to global AI tools
 ait install --global org/repo/agents/reviewer
 
-# Install to specific tools
+# Install to specific tools only
 ait install --target opencode --target cursor org/repo/agents/reviewer
 ```
 
 **Flags:**
-- `--global` or `-g` - Install to AI tools globally instead of project root
-- `--target` or `-t` - Specify which tools to install to
-- `--save` or `-s` - Add installed packages to ait.yml (default: true, use --save=false to disable)
+- `--global, -g` - Install to AI tools globally (not project root)
+- `--target, -t` - Specify tools: `opencode`, `cursor`, `claude`
+- `--save, -s` - Add to ait.yml (default: true, use `--save=false` to disable)
 
-### ait list
+**What it does:**
+1. Parses package specs
+2. Resolves dependencies (including transitive)
+3. Fetches packages from remote sources
+4. Installs to target locations
+5. Creates/updates `ait.lock`
+6. Updates `ait.yml` (if --save=true)
 
-List installed packages:
+---
+
+### `ait list`
+
+List installed packages.
 
 ```bash
-# List all
+# List all packages
 ait list
 
 # List for specific tool
 ait list --target opencode
+
+# List global packages
+ait list --global
 ```
 
-### ait update
+**Output:**
+```
+Listing project-local packages from /path/to/project
+  • code-reviewer (1.0.0) [agent]
+  • python (2.1.0) [skill]
+  • debug-helper (1.5.0) [prompt]
 
-Update packages to their latest compatible versions:
+✓ Total: 3 package(s) installed
+ℹ   • 1 agent(s)
+ℹ   • 1 skill(s)
+ℹ   • 1 prompt(s)
+```
+
+---
+
+### `ait update`
+
+Update packages to their latest compatible versions.
 
 ```bash
 # Update all packages from ait.yml
@@ -526,9 +575,44 @@ ait update code-reviewer python-skill
 ait update --target opencode --target cursor
 ```
 
-### ait uninstall
+**What it does:**
+1. Reads `ait.yml` and `ait.lock`
+2. Checks for newer versions matching constraints
+3. Updates packages respecting semver
+4. Updates `ait.lock`
 
-Remove installed packages:
+---
+
+### `ait outdated`
+
+Check for outdated packages.
+
+```bash
+# Check for outdated packages
+ait outdated
+
+# Show all packages (including up-to-date)
+ait outdated --all
+```
+
+**Output:**
+```
+ℹ Checking for outdated packages...
+
+PACKAGE         CURRENT    LATEST     TYPE     STATUS
+--------------  ---------  ---------  -------  ----------
+code-reviewer   1.0.0      2.0.0      agent    outdated
+python          2.1.0      2.1.0      skill    up-to-date
+
+⚠ 1 package(s) outdated
+ℹ Run 'ait update' to update packages
+```
+
+---
+
+### `ait uninstall`
+
+Remove installed packages.
 
 ```bash
 # Uninstall from project root (default)
@@ -544,30 +628,11 @@ ait uninstall code-reviewer --target cursor
 ait uninstall code-reviewer python-skill
 ```
 
-**Flags:**
-- `--global` or `-g` - Uninstall from AI tools globally instead of project root
-- `--target` or `-t` - Specify which tools to uninstall from
+---
 
-### ait generate
+### `ait sync`
 
-Generate `ait.yml` from existing installed packages:
-
-```bash
-# Generate from project root installation
-ait generate
-
-# Generate from global installations
-ait generate --global
-```
-
-Useful for:
-- Creating `ait.yml` from an existing project
-- Documenting currently installed packages
-- Migrating from manual installation to AIT
-
-### ait sync
-
-Sync project-level packages to global AI tools:
+Sync project-level packages to global AI tools.
 
 ```bash
 # Sync all project packages to global tools
@@ -577,306 +642,1021 @@ ait sync
 ait sync --target opencode
 ```
 
-Useful for:
-- Tools that don't support project-level detection (e.g., Claude Desktop)
-- Making project agents available globally on your machine
-- Refreshing global installations after project changes
+**Use case:** Tools that don't support project-level detection (like Claude Desktop).
 
-### ait doctor
+---
 
-Check your AIT installation health and configuration:
+### `ait doctor`
+
+Check AIT installation health and configuration.
 
 ```bash
 # Run health checks
 ait doctor
 ```
 
-Checks include:
-- Git installation
-- AI tools detection (OpenCode, Cursor, Claude Desktop)
-- Configuration directories and permissions
-- Project manifest (ait.yml) and lockfile (ait.lock) validity
-- GitHub authentication setup
+**Checks:**
+- ✓ Git installation
+- ✓ AI tools detection (OpenCode, Cursor, Claude)
+- ✓ Configuration directories and permissions
+- ✓ Project manifest (ait.yml) validity
+- ✓ Lockfile (ait.lock) validity
+- ✓ GitHub authentication setup
 
-Useful for:
-- Troubleshooting installation issues
-- Verifying environment setup
-- Checking project configuration
+**Output:**
+```
+ℹ Running AIT health checks...
 
-### ait outdated
+✓ Git installation: git version 2.53.0
+✓ AI tools detection: Found: [opencode cursor claude]
+✓ OpenCode: Detected at ~/.config/opencode
+✓ Cursor: Detected at ~/Library/.../Cursor/User
+✓ Claude Desktop: Detected at ~/.claude
+✓ Current directory: /path/to/project
+✓ Write permissions: Current directory is writable
+⚠ ait.yml: Not found (run 'ait init' to create)
+⚠ ait.lock: Not found (will be created on first install)
+✓ GitHub authentication: GitHub token configured
 
-Check for outdated packages in your project:
-
-```bash
-# Check for outdated packages
-ait outdated
-
-# Show all packages (including up-to-date ones)
-ait outdated --all
+⚠ 2 warning(s)
+ℹ Your AIT installation has warnings but should work
 ```
 
-**Flags:**
-- `--all` or `-a` - Show all packages, not just outdated ones
+---
 
-Features:
-- Compares installed versions with latest available versions
-- Shows version differences in a formatted table
-- Identifies packages that can be updated
-- Skips local packages (always considered up-to-date)
+### `ait generate`
+
+Generate `ait.yml` from existing installations.
+
+```bash
+# Generate from project root installation
+ait generate
+
+# Generate from global installations
+ait generate --global
+```
+
+**Use case:** Migrate existing manual installations to AIT.
+
+---
+
+## Creating an AI Marketplace Monorepo
+
+Create a centralized repository for your organization's AI agents, skills, and prompts.
+
+### Repository Structure
+
+```
+ai-marketplace/
+├── README.md                         # Marketplace documentation
+├── agents/
+│   ├── code-reviewer/
+│   │   ├── package.yml               # Package metadata
+│   │   ├── AGENT.md                  # Agent instructions
+│   │   └── README.md                 # Agent documentation
+│   ├── test-generator/
+│   │   ├── package.yml
+│   │   ├── AGENT.md
+│   │   └── README.md
+│   └── pr-assistant/
+│       ├── package.yml
+│       └── AGENT.md
+├── skills/
+│   ├── python/
+│   │   ├── package.yml
+│   │   ├── SKILL.md
+│   │   └── examples/
+│   ├── typescript/
+│   │   ├── package.yml
+│   │   └── SKILL.md
+│   └── docker/
+│       ├── package.yml
+│       └── SKILL.md
+├── prompts/
+│   ├── debug-helper/
+│   │   ├── package.yml
+│   │   └── prompt.txt
+│   ├── pr-description/
+│   │   ├── package.yml
+│   │   └── prompt.txt
+│   └── code-explanation/
+│       ├── package.yml
+│       └── prompt.txt
+└── mcp/
+    └── filesystem-server/
+        ├── package.yml
+        └── server.js
+```
+
+### Step-by-Step Setup
+
+#### 1. Create the Repository
+
+```bash
+# Create repository
+mkdir ai-marketplace
+cd ai-marketplace
+git init
+
+# Create directory structure
+mkdir -p agents skills prompts mcp
+```
+
+#### 2. Create Your First Package
+
+```bash
+# Create a code reviewer agent
+mkdir -p agents/code-reviewer
+cd agents/code-reviewer
+
+# Create package.yml
+cat > package.yml << 'EOF'
+name: code-reviewer
+version: 1.0.0
+type: agent
+description: Expert code reviewer that checks for bugs, performance, and best practices
+author: Your Organization
+repository: https://github.com/your-org/ai-marketplace
+
+dependencies: []
+
+metadata:
+  tags:
+    - code-review
+    - quality
+    - best-practices
+  languages:
+    - typescript
+    - python
+    - go
+EOF
+
+# Create AGENT.md
+cat > AGENT.md << 'EOF'
+# Code Reviewer Agent
+
+You are an expert code reviewer with deep knowledge of software engineering best practices.
+
+## Your Role
+
+Analyze code for:
+- Bugs and potential errors
+- Performance issues
+- Security vulnerabilities
+- Code style and readability
+- Best practices violations
+
+## Core Competencies
+
+1. **Bug Detection**: Identify logic errors, edge cases, and potential runtime issues
+2. **Performance**: Spot inefficient algorithms, memory leaks, and bottlenecks
+3. **Security**: Recognize common vulnerabilities (XSS, SQL injection, etc.)
+4. **Best Practices**: Enforce SOLID principles, DRY, and language-specific idioms
+
+## Guidelines
+
+- Always explain WHY something is an issue
+- Provide specific code examples for fixes
+- Prioritize issues by severity (critical, high, medium, low)
+- Be constructive and educational in feedback
+EOF
+
+# Create README.md
+cat > README.md << 'EOF'
+# Code Reviewer Agent
+
+Expert code review assistant that provides comprehensive feedback on code quality, bugs, performance, and best practices.
+
+## Features
+
+- 🐛 Bug detection and analysis
+- ⚡ Performance optimization suggestions
+- 🔒 Security vulnerability identification
+- 📚 Best practices enforcement
+
+## Installation
+
+```bash
+# Using AIT
+ait install your-org/ai-marketplace/agents/code-reviewer
+
+# Or add to ait.yml
+dependencies:
+  - your-org/ai-marketplace/agents/code-reviewer
+```
+
+## Usage
+
+In your AI tool (Cursor, GitHub Copilot, etc.):
+
+```
+Review this function for potential issues:
+[paste code]
+```
+
+The agent will provide detailed feedback on bugs, performance, security, and best practices.
+
+## Version History
+
+- v1.0.0 - Initial release
+EOF
+```
+
+#### 3. Create More Packages
+
+```bash
+# Create a Python skill
+mkdir -p ../../skills/python
+cd ../../skills/python
+
+cat > package.yml << 'EOF'
+name: python
+version: 2.1.0
+type: skill
+description: Expert Python programming knowledge
+author: Your Organization
+
+dependencies: []
+
+metadata:
+  tags:
+    - python
+    - programming
+  frameworks:
+    - django
+    - flask
+    - fastapi
+EOF
+
+cat > SKILL.md << 'EOF'
+# Python Expert Skill
+
+You are a Python expert with deep knowledge of the language and its ecosystem.
+
+## Core Competencies
+
+1. **Language Features**: List comprehensions, generators, decorators, context managers
+2. **Standard Library**: Collections, itertools, functools, asyncio
+3. **Frameworks**: Django, Flask, FastAPI, Celery
+4. **Testing**: pytest, unittest, mocking, fixtures
+5. **Performance**: Profiling, optimization, Cython, multiprocessing
+6. **Best Practices**: PEP 8, type hints, documentation, packaging
+
+## Guidelines
+
+- Write Pythonic code following PEP 8
+- Use type hints for better code clarity
+- Prefer standard library over third-party when reasonable
+- Write comprehensive docstrings
+- Consider performance implications
+EOF
+```
+
+#### 4. Create Package Index (Optional)
+
+```bash
+# Create a catalog of all packages
+cd ../..
+cat > catalog.json << 'EOF'
+{
+  "version": "1.0",
+  "packages": [
+    {
+      "name": "code-reviewer",
+      "type": "agent",
+      "version": "1.0.0",
+      "path": "agents/code-reviewer",
+      "description": "Expert code reviewer",
+      "tags": ["code-review", "quality"]
+    },
+    {
+      "name": "python",
+      "type": "skill",
+      "version": "2.1.0",
+      "path": "skills/python",
+      "description": "Python programming expert",
+      "tags": ["python", "programming"]
+    }
+  ]
+}
+EOF
+```
+
+#### 5. Create Marketplace README
+
+```bash
+cat > README.md << 'EOF'
+# AI Marketplace
+
+Centralized repository of AI agents, skills, and prompts for our organization.
+
+## 📦 Available Packages
+
+### Agents
+
+- **code-reviewer** (v1.0.0) - Expert code review assistant
+- **test-generator** (v1.0.0) - Automated test generation
+- **pr-assistant** (v1.0.0) - Pull request description helper
+
+### Skills
+
+- **python** (v2.1.0) - Python programming expert
+- **typescript** (v2.0.0) - TypeScript expert
+- **docker** (v1.5.0) - Docker and containerization
+
+### Prompts
+
+- **debug-helper** - Debugging assistance
+- **pr-description** - PR description generator
+- **code-explanation** - Code explainer
+
+## 🚀 Quick Start
+
+```bash
+# Install a package
+ait install your-org/ai-marketplace/agents/code-reviewer
+
+# Or add to your ait.yml
+dependencies:
+  - your-org/ai-marketplace/agents/code-reviewer
+  - your-org/ai-marketplace/skills/python
+```
+
+## 📋 Usage
+
+1. Browse packages in the repository
+2. Add desired packages to your `ait.yml`
+3. Run `ait install`
+4. Packages are automatically available in your AI tools
+
+## 🤝 Contributing
+
+1. Create a new package in the appropriate directory
+2. Include `package.yml` and package file (AGENT.md, SKILL.md, etc.)
+3. Add documentation in README.md
+4. Submit a pull request
+EOF
+```
+
+#### 6. Version Control and Tagging
+
+```bash
+# Commit initial structure
+git add .
+git commit -m "Initial marketplace setup with code-reviewer and python skill"
+
+# Create version tags for releases
+git tag v1.0.0
+git push origin main --tags
+
+# Push to GitHub
+git remote add origin https://github.com/your-org/ai-marketplace
+git push -u origin main
+```
+
+### Using Your Marketplace
+
+#### For Developers
+
+```bash
+# In any project
+cat > ait.yml << EOF
+name: my-project
+version: 1.0.0
+dependencies:
+  - your-org/ai-marketplace/agents/code-reviewer@1.0.0
+  - your-org/ai-marketplace/skills/python@^2.0.0
+  - your-org/ai-marketplace/prompts/debug-helper
+EOF
+
+# Install
+ait install
+
+# Your AI tools now have access to all these packages!
+```
+
+#### For Teams
+
+```yaml
+# ait.yml
+name: team-backend
+version: 1.0.0
+dependencies:
+  # Agents for code quality
+  - your-org/ai-marketplace/agents/code-reviewer
+  - your-org/ai-marketplace/agents/test-generator
+  
+  # Skills for our tech stack
+  - your-org/ai-marketplace/skills/python
+  - your-org/ai-marketplace/skills/docker
+  
+  # Helpful prompts
+  - your-org/ai-marketplace/prompts/pr-description
+```
+
+### Private Marketplace Authentication
+
+For private repositories:
+
+```bash
+# Using GitHub CLI
+gh auth login
+export GH_TOKEN=$(gh auth token)
+
+# Or personal access token
+export GITHUB_TOKEN=ghp_your_token_here
+
+# Install works automatically
+ait install
+```
+
+### Marketplace Best Practices
+
+1. **Semantic Versioning**: Use semver for package versions
+2. **Documentation**: Include comprehensive README for each package
+3. **Testing**: Test packages before releasing
+4. **Changelog**: Maintain version history in README
+5. **Examples**: Provide usage examples
+6. **Tags**: Use metadata tags for discoverability
+7. **Dependencies**: Declare package dependencies in `package.yml`
+
+---
+
+## Developer Setup
+
+### Prerequisites
+
+- Go 1.23 or higher
+- Git
+- Make (optional, for convenience)
+
+### Building from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/ZakHargz/ait
+cd ait
+
+# Install dependencies
+go mod download
+
+# Build
+make build
+# Or: go build -o bin/ait ./cmd/ait
+
+# Run tests
+make test
+# Or: go test ./...
+
+# Run linter
+make lint
+# Or: golangci-lint run
+
+# Build for all platforms
+make build-all
+```
+
+### Project Structure
+
+```
+ait/
+├── cmd/
+│   └── ait/
+│       └── main.go              # Entry point
+├── internal/
+│   ├── cli/                     # CLI commands
+│   │   ├── root.go              # Root command setup
+│   │   ├── init.go              # ait init
+│   │   ├── install.go           # ait install
+│   │   ├── list.go              # ait list
+│   │   ├── update.go            # ait update
+│   │   ├── uninstall.go         # ait uninstall
+│   │   ├── sync.go              # ait sync
+│   │   ├── doctor.go            # ait doctor
+│   │   ├── outdated.go          # ait outdated
+│   │   └── generate.go          # ait generate
+│   ├── config/                  # Configuration
+│   │   ├── manifest.go          # ait.yml parser
+│   │   ├── lockfile.go          # ait.lock handler
+│   │   └── metadata.go          # package.yml parser
+│   ├── resolver/                # Dependency resolution
+│   │   └── resolver.go          # Graph-based resolver
+│   ├── sources/                 # Package sources
+│   │   ├── source.go            # Source interface
+│   │   ├── git.go               # Git repository handler
+│   │   ├── auth.go              # GitHub authentication
+│   │   └── factory.go           # Source factory
+│   ├── adapters/                # Tool adapters
+│   │   ├── adapter.go           # Base adapter
+│   │   ├── opencode.go          # OpenCode adapter
+│   │   ├── cursor.go            # Cursor adapter
+│   │   ├── claude.go            # Claude adapter
+│   │   └── projectroot.go       # Project-level adapter
+│   ├── packages/                # Package types
+│   │   └── package.go           # Package struct
+│   └── utils/                   # Utilities
+│       └── utils.go             # Helper functions
+├── .github/
+│   └── workflows/
+│       ├── ci.yml               # CI pipeline
+│       └── release.yml          # Release automation
+├── Formula/
+│   └── ait.rb                   # Homebrew formula
+├── Makefile                     # Build automation
+├── go.mod                       # Go dependencies
+└── README.md                    # This file
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+go test ./...
+
+# Run with coverage
+go test -cover ./...
+
+# Run specific package tests
+go test ./internal/cli -v
+go test ./internal/resolver -v
+
+# Run with race detection
+go test -race ./...
+```
+
+### Contributing
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes**
+4. **Run tests**: `make test`
+5. **Run linter**: `make lint`
+6. **Commit**: `git commit -m "Add amazing feature"`
+7. **Push**: `git push origin feature/amazing-feature`
+8. **Create a Pull Request**
+
+### Code Style
+
+- Follow Go conventions and idioms
+- Run `gofmt` before committing
+- Use `golangci-lint` for linting
+- Write tests for new features
+- Update documentation for user-facing changes
+
+---
+
+## Use Cases
+
+### 1. Personal Developer Setup
+
+**Scenario**: Individual developer wants consistent AI assistants across projects.
+
+```bash
+# Install personal favorites globally
+ait install --global apex-ai/agents/code-reviewer
+ait install --global apex-ai/skills/python
+ait install --global apex-ai/skills/typescript
+
+# Available in all projects automatically
+```
+
+### 2. Team Onboarding
+
+**Scenario**: New developer joins team and needs AI tools set up.
+
+```bash
+# New developer clones repo
+git clone https://github.com/team/project
+cd project
+
+# AI agents already work!
+# .cursorrules and .github/agents/ are in the repo
+
+# Optional: sync to personal tools
+ait sync
+```
+
+### 3. Multi-Project Consistency
+
+**Scenario**: Organization wants standardized AI assistants across all projects.
+
+```yaml
+# Template ait.yml for all projects
+name: ${PROJECT_NAME}
+version: 1.0.0
+dependencies:
+  # Standard agents for all projects
+  - company/ai-marketplace/agents/code-reviewer
+  - company/ai-marketplace/agents/security-scanner
+  - company/ai-marketplace/agents/test-generator
+  
+  # Standard skills
+  - company/ai-marketplace/skills/company-standards
+```
+
+### 4. Specialized Project Setup
+
+**Scenario**: Machine learning project needs ML-specific AI assistants.
+
+```yaml
+name: ml-project
+version: 1.0.0
+dependencies:
+  # ML-specific agents
+  - ml-org/agents/model-reviewer
+  - ml-org/agents/data-validator
+  
+  # ML skills
+  - ml-org/skills/pytorch
+  - ml-org/skills/tensorflow
+  - ml-org/skills/data-science
+  
+  # ML prompts
+  - ml-org/prompts/experiment-design
+  - ml-org/prompts/hyperparameter-tuning
+```
+
+### 5. CI/CD Integration
+
+**Scenario**: Run AI-powered code reviews in CI pipeline.
+
+```yaml
+# .github/workflows/ai-review.yml
+name: AI Code Review
+on: [pull_request]
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install AIT
+        run: |
+          brew tap zakhargz/ait
+          brew install ait
+      
+      - name: Install AI agents
+        run: ait install
+      
+      - name: Run AI review
+        run: |
+          # Use installed agents for automated review
+          ait list
+```
+
+---
 
 ## Supported AI Tools
+
+### OpenCode ✅
+
+- **Status**: Fully supported
+- **Project-Level**: `.opencode/agents/<name>/AGENT.md`
+- **Global Location**: `~/.config/opencode/agents/`
+- **Format**: Native AGENT.md format
+- **Auto-Detection**: Proposed standard
 
 ### Cursor ✅
 
 - **Status**: Fully supported with project-level detection
 - **Project-Level**: `.cursorrules` (auto-detected by Cursor)
-- **Global Location**: `~/Library/Application Support/Cursor/User/ait-*` (macOS)
+- **Global Location**: `~/Library/Application Support/Cursor/User/` (macOS)
 - **Format**: Converts AGENT.md to `.cursorrules` format
-- **Auto-Detection**: ✅ Yes - Cursor automatically loads `.cursorrules` at project root
+- **Auto-Detection**: ✅ Yes - Cursor loads `.cursorrules` at project root
 
 ### GitHub Copilot ✅
 
 - **Status**: Fully supported with project-level detection
-- **Project-Level**: `.github/agents/<name>.agent.md` (auto-detected by GitHub Copilot, VS Code, IntelliJ)
+- **Project-Level**: `.github/agents/<name>.agent.md`
 - **Format**: Native `.agent.md` format (APM standard)
-- **Auto-Detection**: ✅ Yes - GitHub Copilot automatically loads agents from `.github/agents/`
-
-### OpenCode ✅
-
-- **Status**: Fully supported
-- **Project-Level**: `.opencode/agents/<name>/AGENT.md` (proposed standard)
-- **Global Location**: `~/.config/opencode/`
-- **Format**: Native AGENT.md format
-- **Auto-Detection**: ⚠️ Use `ait sync` to copy to global location if needed
-- **Agents**: `~/.config/opencode/agents/<name>/AGENT.md`
-- **Skills**: `~/.config/opencode/skills/<name>/SKILL.md`
-- **Prompts**: `~/.config/opencode/prompts/<name>.txt`
+- **Auto-Detection**: ✅ Yes - works in VS Code, IntelliJ, GitHub.com
+- **Standard**: Follows Microsoft APM specification
 
 ### Claude Desktop ✅
 
 - **Status**: Fully supported (global only)
-- **Location**: `~/.claude/`
-- **Format**: Same as OpenCode (AGENT.md, SKILL.md)
-- **Auto-Detection**: ❌ No - Requires global installation with `--global` flag
-- **Agents**: `~/.claude/agents/<name>/AGENT.md`
-- **Skills**: `~/.claude/skills/<name>/SKILL.md`
-- **Prompts**: `~/.claude/prompts/<name>.txt`
+- **Global Location**: `~/.claude/` (macOS)
+- **Format**: Converts to Claude-specific format
+- **Note**: Use `ait sync` to push project packages to Claude
 
-**Summary of Project-Level Support:**
-- ✅ **Cursor** - Full auto-detection via `.cursorrules`
-- ✅ **GitHub Copilot** - Full auto-detection via `.github/agents/*.agent.md` (APM standard)
-- ⚠️ **OpenCode** - Project files created, use `ait sync` for global
-- ❌ **Claude Desktop** - Global installation only
+---
 
-## Development Status
+## Package Format
 
-### ✅ Implemented (v0.3.0)
+### package.yml
 
-- CLI framework (Cobra/Viper)
-- Configuration parsing (ait.yml, package.yml, ait.lock)
-- `ait init` command
-- `ait install` command with project-level and global installation
-- `ait list` command
-- `ait update` command - Update packages to latest compatible versions
-- `ait uninstall` command - Remove packages with --global support
-- `ait generate` command - Generate ait.yml from installed packages
-- `ait sync` command - Sync project packages to global tools
-- **Project-Level Installation** - Tool-native file generation:
-  - `.cursorrules` for Cursor (auto-detected)
-  - `.github/agents/*.agent.md` for GitHub Copilot, VS Code, IntelliJ (APM standard)
-  - `.opencode/agents/` for OpenCode (proposed standard)
-- **Global Installation** - Install to AI tools' global directories
-- OpenCode adapter (agents, skills, prompts)
-- Cursor adapter (agents, skills, prompts with .cursorrules conversion)
-- Claude Desktop adapter (agents, skills, prompts)
-- Git-based sources (GitHub, GitLab, generic)
-- Local filesystem sources
-- Semantic versioning with optional version specifications (defaults to "latest")
-- Dependency resolution with cycle detection
-- Lock file generation
-- Local caching (~/.ait/cache/)
-- Test package repository
-- Multi-tool detection and installation
+Every package must include a `package.yml` metadata file:
 
-### 🔄 Planned
+```yaml
+name: code-reviewer
+version: 1.0.0
+type: agent                    # agent, skill, prompt, or mcp
+description: Expert code reviewer
+author: Your Name
+repository: https://github.com/org/repo
 
-- `ait search` command - Package discovery
-- `ait audit` command - Security scanning
-- `ait doctor` command - Health checks
-- MCP server support
-- Package registry/marketplace
-- VSCode adapter
-- Additional IDE support
+dependencies:
+  - org/repo/skills/python     # Package dependencies
+  - org/repo/skills/typescript
 
-## Project Structure
-
+metadata:
+  tags:
+    - code-review
+    - quality
+  languages:
+    - python
+    - typescript
+    - go
 ```
-ait/
-├── cmd/ait/              # CLI entry point
-├── internal/
-│   ├── adapters/         # Platform adapters
-│   │   ├── adapter.go   # Interface
-│   │   ├── opencode.go  # OpenCode implementation
-│   │   ├── cursor.go    # Cursor implementation
-│   │   ├── claude.go    # Claude Desktop implementation
-│   │   ├── projectroot.go # Project-root adapter (NEW)
-│   │   └── detector.go  # Tool detection
-│   ├── cli/              # Commands
-│   │   ├── root.go      # Root command
-│   │   ├── init.go      # Init command
-│   │   ├── install.go   # Install command
-│   │   ├── list.go      # List command
-│   │   ├── update.go    # Update command
-│   │   ├── uninstall.go # Uninstall command
-│   │   ├── generate.go  # Generate command (NEW)
-│   │   └── sync.go      # Sync command (NEW)
-│   ├── config/           # Configuration
-│   │   ├── manifest.go  # ait.yml
-│   │   ├── package.go   # package.yml
-│   │   └── lockfile.go  # ait.lock
-│   ├── sources/          # Package sources
-│   │   ├── source.go    # Interface
-│   │   ├── git.go       # Git implementation
-│   │   └── factory.go   # Source factory
-│   ├── resolver/         # Dependency resolution
-│   ├── packages/         # Package model
-│   └── utils/            # Utilities
-├── test-packages/        # Test packages
-├── Makefile             # Build automation
-├── README.md            # This file
-├── DEVELOPMENT.md       # Development notes
-├── DETECTION_STRATEGY.md # Tool detection architecture (NEW)
-└── go.mod               # Go dependencies
-```
+
+### AGENT.md Format
+
+Agent instruction files follow this structure:
+
+```markdown
+# Agent Name
+
+Brief description of the agent's purpose.
+
+## Your Role
+
+Describe what this agent does and its primary responsibilities.
+
+## Core Competencies
+
+1. **Competency 1**: Description
+2. **Competency 2**: Description
+3. **Competency 3**: Description
+
+## Guidelines
+
+- Guideline 1
+- Guideline 2
+- Guideline 3
 
 ## Examples
 
-### Example 1: Personal Agents
+### Example 1
+[Example usage]
 
-```yaml
-# ait.yml
-name: my-agents
-version: 1.0.0
-dependencies:
-  - ~/my-agents/code-reviewer    # Local path, latest version
-  - ~/my-agents/documentation    # Local path, latest version
-targets:
-  - opencode
+### Example 2
+[Example usage]
 ```
 
-### Example 2: Team Toolkit
+### SKILL.md Format
 
-```yaml
-# ait.yml
-name: team-project
-version: 1.0.0
-dependencies:
-  - mycompany/ai-toolkit/agents/security-reviewer@^2.0.0       # Caret constraint
-  - mycompany/ai-toolkit/agents/performance-analyzer           # Latest version
-  - mycompany/ai-toolkit/skills/python@^3.0.0
-  - mycompany/ai-toolkit/skills/terraform                      # Latest version
-targets:
-  - opencode
-  - cursor
+Skill files define domain expertise:
+
+```markdown
+# Skill Name
+
+Description of the skill domain.
+
+## Core Competencies
+
+1. **Area 1**: Expertise description
+2. **Area 2**: Expertise description
+
+## Best Practices
+
+- Practice 1
+- Practice 2
+
+## Common Patterns
+
+### Pattern 1
+[Code example]
+
+### Pattern 2
+[Code example]
 ```
 
-### Example 3: Public Packages with Virtual Files
+### Prompt Format
 
-```yaml
-# ait.yml
-name: open-source-project
-version: 1.0.0
-dependencies:
-  - ai-packages/agents/code-reviewer                    # Latest version (recommended)
-  - ai-packages/agents/test-generator@~2.1.0
-  - ai-packages/skills/javascript                       # Latest version
-  - ai-packages/prompts/debug-helper                    # Latest version
-  - ai-packages/agents/reviewer.agent.md@1.0.0          # Virtual package (single file)
-targets:
-  - opencode
+Simple text files with prompts:
+
 ```
+You are helping debug a complex issue. Follow these steps:
+
+1. Understand the problem
+2. Identify root cause
+3. Propose solutions
+4. Test fixes
+
+Be thorough and methodical.
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. "No AI tools detected"
+
+**Problem**: `ait doctor` shows no AI tools found.
+
+**Solution**:
+```bash
+# Install at least one AI tool:
+# - OpenCode: https://opencode.ai
+# - Cursor: https://cursor.sh
+# - Claude Desktop: https://claude.ai/download
+
+# Verify installation
+ait doctor
+```
+
+#### 2. "GitHub authentication failed"
+
+**Problem**: Cannot access private repositories.
+
+**Solution**:
+```bash
+# Using GitHub CLI
+gh auth login
+export GH_TOKEN=$(gh auth token)
+
+# Or use personal access token
+export GITHUB_TOKEN=ghp_your_token_here
+
+# Verify
+ait doctor
+```
+
+#### 3. "Package not found"
+
+**Problem**: `ait install org/repo/package` fails.
+
+**Solution**:
+```bash
+# Check the repository exists
+# Verify the path is correct: org/repo/path/to/package
+# Ensure you have access (for private repos)
+# Check your internet connection
+
+# Try with explicit version
+ait install org/repo/package@1.0.0
+```
+
+#### 4. "Permission denied"
+
+**Problem**: Cannot write to installation directories.
+
+**Solution**:
+```bash
+# For project-level (default)
+# Ensure you have write permissions in current directory
+chmod u+w .
+
+# For global installation
+# Ensure AI tool directories are writable
+# Or use project-level installation instead
+ait install  # without --global
+```
+
+#### 5. Agents not loading in AI tool
+
+**Problem**: Installed agents don't appear in Cursor/Copilot.
+
+**Solution**:
+```bash
+# Verify installation
+ait list
+
+# Check files were created
+ls -la .cursorrules .github/agents/
+
+# Restart your AI tool
+# Some tools require restart to detect new files
+
+# For Cursor specifically
+# Close Cursor → Delete .cursorrules cache → Reopen
+```
+
+### Debug Mode
+
+```bash
+# Enable verbose output
+ait --verbose install org/repo/package
+
+# Check system health
+ait doctor
+
+# Verify package is in cache
+ls ~/.ait/cache/
+```
+
+### Getting Help
+
+- **Issues**: https://github.com/ZakHargz/ait/issues
+- **Discussions**: https://github.com/ZakHargz/ait/discussions
+- **Documentation**: https://github.com/ZakHargz/ait/wiki
+
+---
 
 ## Contributing
 
-Contributions welcome! This is an early MVP implementation.
+We welcome contributions! Here's how to get started:
 
-### Building
+### Reporting Issues
+
+1. Check existing issues first
+2. Use issue templates
+3. Include reproduction steps
+4. Attach relevant logs and `ait doctor` output
+
+### Submitting Pull Requests
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Update documentation
+6. Submit PR with clear description
+
+### Development Workflow
 
 ```bash
-make build       # Build binary
-make install     # Install globally
-make test        # Run tests (when available)
-make clean       # Clean build artifacts
+# Setup
+git clone https://github.com/ZakHargz/ait
+cd ait
+go mod download
+
+# Make changes
+# ... edit code ...
+
+# Test
+make test
+
+# Lint
+make lint
+
+# Build
+make build
+
+# Test locally
+./bin/ait doctor
 ```
+
+### Code Guidelines
+
+- Follow Go conventions
+- Write tests for new features
+- Update documentation
+- Keep commits focused and atomic
+- Write descriptive commit messages
+
+---
 
 ## Relationship with Microsoft APM
 
-AIT and [Microsoft's Agent Package Manager (APM)](https://microsoft.github.io/apm/) share the same vision: **making AI agent configuration portable, versioned, and easy to share**. While inspired by APM, AIT takes a simpler approach optimized for multi-tool deployment.
+AIT aligns with [Microsoft's Agent Package Manager (APM)](https://microsoft.github.io/apm/) while maintaining compatibility with existing tools.
 
 ### How AIT Differs
 
-- **Multi-tool focus**: AIT deploys to tool-native paths (`.cursorrules`, `.github/copilot-instructions.md`) that work across Cursor, GitHub Copilot, OpenCode, and Claude Desktop
-- **Project-first**: Default behavior is project-level installation for team sharing
-- **Simpler format**: Flat dependency list instead of nested structure
-- **Lightweight**: Single binary, no complex compilation step
+| Feature | APM | AIT |
+|---------|-----|-----|
+| **Package Sources** | npm registry | GitHub, GitLab, Git, Local |
+| **Installation** | Node.js required | Go binary (no runtime) |
+| **Multi-tool** | Primarily VS Code/Copilot | OpenCode, Cursor, Claude, Copilot |
+| **Project-level** | `.github/agents/` | `.github/agents/` + `.cursorrules` + `.opencode/` |
+| **Dependency Resolution** | npm-style | Built-in resolver |
+| **Lockfiles** | package-lock.json style | ait.lock (YAML) |
 
-### Format Comparison
+### Compatibility
 
-**AIT Format (Simpler):**
-```yaml
-name: my-project
-version: 1.0.0
-dependencies:
-  - org/repo/agents/code-reviewer          # Flat list
-  - org/repo/skills/python
-  - gitlab.com/myorg/packages/agents/helper
-  - org/repo/agents/reviewer.agent.md      # Virtual packages
-```
-
-**Microsoft APM Format:**
-```yaml
-name: my-project
-version: 1.0.0
-dependencies:
-  apm:  # Nested structure
-    - org/repo/agents/code-reviewer
-    - org/repo/skills/python
-```
-
-Both formats support:
-- ✅ GitHub shorthand (`org/repo/path`)
-- ✅ FQDN for other hosts (`gitlab.com/...`)
-- ✅ Virtual packages (`.agent.md`, `.skill.md`, etc.)
-- ✅ Semantic versioning
-
-### Backward Compatibility
-
-AIT maintains backward compatibility with:
-- Legacy `github:org/repo` prefix format
-- Nested `agents/skills/prompts` structure
-- APM-style `dependencies.apm` format
-
-This allows gradual migration without breaking existing manifests.
+AIT is **fully compatible** with APM packages:
+- ✅ Reads `.agent.md` files
+- ✅ Installs to `.github/agents/`
+- ✅ Supports `package.json` metadata
+- ✅ Works with GitHub Copilot, VS Code
 
 ### Why Both Projects Matter
 
-- **APM** - Microsoft-backed, comprehensive, enterprise-focused, deep GitHub integration
-- **AIT** - Community-driven, lightweight, multi-tool support, simpler format
+- **APM**: Standard for npm-based workflows, VS Code integration
+- **AIT**: Multi-tool support, no Node.js dependency, extended features
 
-We believe in ecosystem standards and have aligned with APM's core concepts (GitHub shorthand, virtual packages, semantic versioning) while maintaining AIT's unique value proposition of project-native tool detection and multi-tool support.
+Use both! AIT can install APM packages, and vice versa.
+
+---
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
 
 ## Acknowledgments
 
-Built on community standards:
-- [AGENTS.md](https://agents.md) - Agent definition format
-- [Agent Skills](https://agentskills.io) - Skill specification
-- [Model Context Protocol (MCP)](https://modelcontextprotocol.io) - Tool integration standard
+- [Microsoft APM](https://microsoft.github.io/apm/) - Package format inspiration
+- [AGENTS.md](https://agents.md) - Agent format specification
+- [Agent Skills](https://agentskills.io) - Skills format
+- [Model Context Protocol](https://modelcontextprotocol.io) - MCP integration
 
-Inspired by:
-- [Microsoft APM](https://microsoft.github.io/apm/) - Agent Package Manager
-- npm (Node.js package manager)
-- pip (Python package manager)
+---
+
+**Made with ❤️ for the AI development community**
+
+🌟 Star us on GitHub: https://github.com/ZakHargz/ait
