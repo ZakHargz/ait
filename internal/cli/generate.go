@@ -64,7 +64,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	utils.PrintInfo(fmt.Sprintf("Found %d package(s) in .ait/", len(packages)))
+	utils.PrintInfo("Found %d package(s) in .ait/", len(packages))
 
 	// Get project name from directory
 	projectName := filepath.Base(cwd)
@@ -82,7 +82,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		// Create a local reference since packages are already in .ait/
 		spec := fmt.Sprintf("local:.ait/%s/%s@1.0.0", getTypeDir(string(pkg.Type)), pkg.Name)
 		manifest.Dependencies = append(manifest.Dependencies, spec)
-		utils.PrintInfo(fmt.Sprintf("  • %s [%s]", pkg.Name, pkg.Type))
+		utils.PrintInfo("  • %s [%s]", pkg.Name, pkg.Type)
 	}
 
 	if generateDryRun {

@@ -582,6 +582,48 @@ Useful for:
 - Making project agents available globally on your machine
 - Refreshing global installations after project changes
 
+### ait doctor
+
+Check your AIT installation health and configuration:
+
+```bash
+# Run health checks
+ait doctor
+```
+
+Checks include:
+- Git installation
+- AI tools detection (OpenCode, Cursor, Claude Desktop)
+- Configuration directories and permissions
+- Project manifest (ait.yml) and lockfile (ait.lock) validity
+- GitHub authentication setup
+
+Useful for:
+- Troubleshooting installation issues
+- Verifying environment setup
+- Checking project configuration
+
+### ait outdated
+
+Check for outdated packages in your project:
+
+```bash
+# Check for outdated packages
+ait outdated
+
+# Show all packages (including up-to-date ones)
+ait outdated --all
+```
+
+**Flags:**
+- `--all` or `-a` - Show all packages, not just outdated ones
+
+Features:
+- Compares installed versions with latest available versions
+- Shows version differences in a formatted table
+- Identifies packages that can be updated
+- Skips local packages (always considered up-to-date)
+
 ## Supported AI Tools
 
 ### Cursor ✅

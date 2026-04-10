@@ -85,12 +85,12 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 
 	// Uninstall each package
 	for _, pkgName := range packageNames {
-		utils.PrintInfo(fmt.Sprintf("Uninstalling %s...", pkgName))
+		utils.PrintInfo("Uninstalling %s...", pkgName)
 
 		// Check if package exists in lock file
 		lockedPkg, ok := lockFile.GetPackage(pkgName)
 		if !ok {
-			utils.PrintWarning(fmt.Sprintf("Package %s not found in lock file, attempting to uninstall anyway", pkgName))
+			utils.PrintWarning("Package %s not found in lock file, attempting to uninstall anyway", pkgName)
 		}
 
 		// Create a minimal package struct for uninstall
@@ -109,17 +109,17 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 		for toolName, adapter := range targetAdapters {
 			// Skip if not installed to this tool (if we have lock file info)
 			if ok && !isInstalledToTool(lockedPkg.Installed, toolName) {
-				utils.PrintInfo(fmt.Sprintf("Package %s not installed to %s, skipping", pkgName, toolName))
+				utils.PrintInfo("Package %s not installed to %s, skipping", pkgName, toolName)
 				continue
 			}
 
 			// Try to uninstall
 			if err := adapter.Uninstall(pkg); err != nil {
-				utils.PrintWarning(fmt.Sprintf("Failed to uninstall from %s: %s", toolName, err.Error()))
+				utils.PrintWarning("Failed to uninstall from %s: %s", toolName, err.Error())
 				continue
 			}
 
-			utils.PrintSuccess(fmt.Sprintf("Uninstalled %s from %s", pkgName, toolName))
+			utils.PrintSuccess("Uninstalled %s from %s", pkgName, toolName)
 			uninstalledFromAny = true
 		}
 
@@ -139,7 +139,7 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 				lockFile.Packages[pkgName] = lockedPkg
 			}
 		} else {
-			utils.PrintError(fmt.Sprintf("Failed to uninstall %s from any tool", pkgName))
+			utils.PrintError("Failed to uninstall %s from any tool", pkgName)
 		}
 	}
 
@@ -151,12 +151,12 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	// Write updated lock file
 	if uninstalledCount > 0 {
 		if err := lockFile.Write(lockPath); err != nil {
-			utils.PrintWarning(fmt.Sprintf("Failed to update lock file: %s", err.Error()))
+			utils.PrintWarning("Failed to update lock file: %s", err.Error())
 		} else {
 			utils.PrintInfo("Updated ait.lock")
 		}
 
-		utils.PrintSuccess(fmt.Sprintf("Successfully uninstalled %d package(s)", uninstalledCount))
+		utils.PrintSuccess("Successfully uninstalled %d package(s)", uninstalledCount)
 	} else {
 		return fmt.Errorf("no packages were uninstalled")
 	}
@@ -230,7 +230,7 @@ func getGlobalAdaptersForUninstall(targets []string) (map[string]adapters.Adapte
 			return nil, fmt.Errorf("no AI tools detected")
 		}
 		targetTools = detectedTools
-		utils.PrintInfo(fmt.Sprintf("Found tools: %v", targetTools))
+		utils.PrintInfo("Found tools: %v", targetTools)
 	}
 
 	// Create adapters for target tools
@@ -238,7 +238,7 @@ func getGlobalAdaptersForUninstall(targets []string) (map[string]adapters.Adapte
 	for _, target := range targetTools {
 		adapter, err := adapters.GetAdapter(target)
 		if err != nil {
-			utils.PrintWarning(fmt.Sprintf("Skipping %s: %s", target, err.Error()))
+			utils.PrintWarning("Skipping %s: %s", target, err.Error())
 			continue
 		}
 		targetAdapters[target] = adapter

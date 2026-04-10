@@ -77,7 +77,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	utils.PrintInfo(fmt.Sprintf("Found %d package(s) in .ait/", len(projectPackages)))
+	utils.PrintInfo("Found %d package(s) in .ait/", len(projectPackages))
 
 	// Get global AI tool adapters
 	targetAdapters, err := getGlobalAdapters(syncTargets)
@@ -92,9 +92,9 @@ func runSync(cmd *cobra.Command, args []string) error {
 	if syncDryRun {
 		utils.PrintInfo("\n--- Dry Run: Packages that would be synced ---")
 		for _, pkg := range projectPackages {
-			utils.PrintInfo(fmt.Sprintf("  • %s [%s]", pkg.Name, pkg.Type))
+			utils.PrintInfo("  • %s [%s]", pkg.Name, pkg.Type)
 			for toolName := range targetAdapters {
-				utils.PrintInfo(fmt.Sprintf("    → %s", toolName))
+				utils.PrintInfo("    → %s", toolName)
 			}
 		}
 		utils.PrintInfo("--- End of dry-run ---")
@@ -103,11 +103,11 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	// Sync each package to each tool
-	utils.PrintInfo(fmt.Sprintf("Syncing to %d tool(s)...", len(targetAdapters)))
+	utils.PrintInfo("Syncing to %d tool(s)...", len(targetAdapters))
 
 	syncedCount := 0
 	for _, pkg := range projectPackages {
-		utils.PrintInfo(fmt.Sprintf("Syncing %s...", pkg.Name))
+		utils.PrintInfo("Syncing %s...", pkg.Name)
 
 		for toolName, adapter := range targetAdapters {
 			// Check if package already exists in tool
@@ -121,23 +121,23 @@ func runSync(cmd *cobra.Command, args []string) error {
 			}
 
 			if exists && !syncForce {
-				utils.PrintWarning(fmt.Sprintf("  • %s already has %s (use --force to overwrite)", toolName, pkg.Name))
+				utils.PrintWarning("  • %s already has %s (use --force to overwrite)", toolName, pkg.Name)
 				continue
 			}
 
 			// Install to tool
 			if err := installToAdapter(pkg, adapter, toolName); err != nil {
-				utils.PrintWarning(fmt.Sprintf("  • Failed to sync to %s: %s", toolName, err.Error()))
+				utils.PrintWarning("  • Failed to sync to %s: %s", toolName, err.Error())
 				continue
 			}
 
-			utils.PrintSuccess(fmt.Sprintf("  • Synced to %s", toolName))
+			utils.PrintSuccess("  • Synced to %s", toolName)
 		}
 		syncedCount++
 	}
 
 	if syncedCount > 0 {
-		utils.PrintSuccess(fmt.Sprintf("\nSuccessfully synced %d package(s)", syncedCount))
+		utils.PrintSuccess("\nSuccessfully synced %d package(s)", syncedCount)
 		utils.PrintInfo("Your AI tools can now access these packages!")
 	}
 

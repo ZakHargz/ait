@@ -107,7 +107,7 @@ To use this agent in Cursor:
 	readmePath := filepath.Join(targetDir, "README.md")
 	if err := os.WriteFile(readmePath, []byte(readme), 0644); err != nil {
 		// Non-fatal, just warn
-		utils.PrintWarning(fmt.Sprintf("Could not write README: %s", err.Error()))
+		utils.PrintWarning("Could not write README: %v", err)
 	}
 
 	return nil
@@ -116,108 +116,38 @@ To use this agent in Cursor:
 // InstallSkill installs a skill package for Cursor
 func (a *CursorAdapter) InstallSkill(pkg *packages.Package) error {
 	// Similar to agents, create custom directory
-	targetDir := filepath.Join(a.configDir, "ait-skills", pkg.Name)
-
-	// Create directory
-	if err := utils.EnsureDir(targetDir); err != nil {
-		return fmt.Errorf("failed to create skill directory: %w", err)
-	}
-
-	// Get source file
-	sourceFile := pkg.GetFile("cursor")
-	if sourceFile == "" {
-		sourceFile = "SKILL.md"
-	}
-
-	source := filepath.Join(pkg.Path, sourceFile)
-	dest := filepath.Join(targetDir, "skill.md")
-
-	// Copy file
-	if err := utils.CopyFile(source, dest); err != nil {
-		return fmt.Errorf("failed to install skill: %w", err)
-	}
-
-	return nil
+	return InstallPackageFile(pkg, a.configDir, "cursor", PackageInstallConfig{
+		TargetSubdir:     "ait-skills",
+		SourceFileName:   "SKILL.md",
+		DestFileName:     "skill.md",
+		UsePackageSubdir: true,
+	})
 }
 
 // InstallPrompt installs a prompt package for Cursor
 func (a *CursorAdapter) InstallPrompt(pkg *packages.Package) error {
 	// Create prompts directory
-	targetDir := filepath.Join(a.configDir, "ait-prompts")
-
-	// Create directory
-	if err := utils.EnsureDir(targetDir); err != nil {
-		return fmt.Errorf("failed to create prompts directory: %w", err)
-	}
-
-	// Get source file
-	sourceFile := pkg.GetFile("cursor")
-	if sourceFile == "" {
-		sourceFile = "prompt.txt"
-	}
-
-	source := filepath.Join(pkg.Path, sourceFile)
-	dest := filepath.Join(targetDir, pkg.Name+".txt")
-
-	// Copy file
-	if err := utils.CopyFile(source, dest); err != nil {
-		return fmt.Errorf("failed to install prompt: %w", err)
-	}
-
-	return nil
+	return InstallPackageFile(pkg, a.configDir, "cursor", PackageInstallConfig{
+		TargetSubdir:     "ait-prompts",
+		SourceFileName:   "prompt.txt",
+		DestFileName:     pkg.Name + ".txt",
+		UsePackageSubdir: false,
+	})
 }
 
 // Uninstall removes a package from Cursor
 func (a *CursorAdapter) Uninstall(pkg *packages.Package) error {
-	var targetPath string
-
-	switch pkg.Type {
-	case packages.TypeAgent:
-		targetPath = filepath.Join(a.configDir, "ait-agents", pkg.Name)
-	case packages.TypeSkill:
-		targetPath = filepath.Join(a.configDir, "ait-skills", pkg.Name)
-	case packages.TypePrompt:
-		targetPath = filepath.Join(a.configDir, "ait-prompts", pkg.Name+".txt")
-	default:
-		return fmt.Errorf("unsupported package type: %s", pkg.Type)
-	}
-
-	return os.RemoveAll(targetPath)
+	return UninstallPackage(pkg, a.configDir, "ait-agents", "ait-skills", "ait-prompts")
 }
 
 // List returns all installed packages for Cursor
 func (a *CursorAdapter) List() ([]*packages.Package, error) {
-	installed := []*packages.Package{}
-
-	// List agents
-	agentsDir := filepath.Join(a.configDir, "ait-agents")
-	if agents, err := listPackagesInDir(agentsDir, packages.TypeAgent); err == nil {
-		installed = append(installed, agents...)
-	}
-
-	// List skills
-	skillsDir := filepath.Join(a.configDir, "ait-skills")
-	if skills, err := listPackagesInDir(skillsDir, packages.TypeSkill); err == nil {
-		installed = append(installed, skills...)
-	}
-
-	// List prompts
-	promptsDir := filepath.Join(a.configDir, "ait-prompts")
-	if prompts, err := listPromptsInDir(promptsDir); err == nil {
-		installed = append(installed, prompts...)
-	}
-
-	return installed, nil
+	return ListPackages(a.configDir, "ait-agents", "ait-skills", "ait-prompts")
 }
 
 // Validate checks if Cursor installation is healthy
 func (a *CursorAdapter) Validate() error {
-	// Check if config directory exists
-	if !utils.DirExists(a.configDir) {
-		return fmt.Errorf("cursor config directory does not exist: %s", a.configDir)
-	}
-
-	return nil
+	return ValidateConfigDir(a.configDir, false)
 }
 
 // convertToCursorRules converts AGENT.md content to .cursorrules format

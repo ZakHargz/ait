@@ -99,7 +99,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	for _, target := range updateTargets {
 		adapter, err := adapters.GetAdapter(target)
 		if err != nil {
-			utils.PrintWarning(fmt.Sprintf("Skipping %s: %s", target, err.Error()))
+			utils.PrintWarning("Skipping %s: %s", target, err.Error())
 			continue
 		}
 		targetAdapters[target] = adapter
@@ -109,7 +109,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no valid target tools available")
 	}
 
-	utils.PrintInfo(fmt.Sprintf("Updating %d package(s) to %d tool(s)...", len(specsToUpdate), len(targetAdapters)))
+	utils.PrintInfo("Updating %d package(s) to %d tool(s)...", len(specsToUpdate), len(targetAdapters))
 
 	// Load lock file to check current versions
 	lockPath := "ait.lock"
@@ -130,7 +130,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		// Parse spec
 		spec, err := sources.ParsePackageSpec(specStr)
 		if err != nil {
-			utils.PrintError(fmt.Sprintf("Invalid spec %s: %s", specStr, err.Error()))
+			utils.PrintError("Invalid spec %s: %s", specStr, err.Error())
 			continue
 		}
 
@@ -139,28 +139,28 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		// Check current version
 		currentPkg, exists := lockFile.GetPackage(pkgName)
 		if exists {
-			utils.PrintInfo(fmt.Sprintf("Updating %s from %s...", pkgName, currentPkg.Resolved))
+			utils.PrintInfo("Updating %s from %s...", pkgName, currentPkg.Resolved)
 		} else {
-			utils.PrintInfo(fmt.Sprintf("Installing %s (not currently installed)...", pkgName))
+			utils.PrintInfo("Installing %s (not currently installed)...", pkgName)
 		}
 
 		// Get source
 		source, err := sources.GetSource(*spec)
 		if err != nil {
-			utils.PrintError(fmt.Sprintf("Failed to get source for %s: %s", pkgName, err.Error()))
+			utils.PrintError("Failed to get source for %s: %s", pkgName, err.Error())
 			continue
 		}
 
 		// Fetch latest version matching constraint
 		pkg, err := source.Fetch(*spec)
 		if err != nil {
-			utils.PrintError(fmt.Sprintf("Failed to fetch %s: %s", pkgName, err.Error()))
+			utils.PrintError("Failed to fetch %s: %s", pkgName, err.Error())
 			continue
 		}
 
 		// Check if version changed
 		if exists && pkg.Version == currentPkg.Resolved {
-			utils.PrintInfo(fmt.Sprintf("✓ %s is already up to date (%s)", pkgName, pkg.Version))
+			utils.PrintInfo("✓ %s is already up to date (%s)", pkgName, pkg.Version)
 			continue
 		}
 
@@ -168,10 +168,10 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		installSuccess := false
 		for toolName, adapter := range targetAdapters {
 			if err := installToAdapter(pkg, adapter, toolName); err != nil {
-				utils.PrintWarning(fmt.Sprintf("Failed to install to %s: %s", toolName, err.Error()))
+				utils.PrintWarning("Failed to install to %s: %s", toolName, err.Error())
 				continue
 			}
-			utils.PrintSuccess(fmt.Sprintf("✓ Updated %s to %s in %s", pkgName, pkg.Version, toolName))
+			utils.PrintSuccess("✓ Updated %s to %s in %s", pkgName, pkg.Version, toolName)
 			installSuccess = true
 		}
 
@@ -195,11 +195,11 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	if updatedCount > 0 {
-		utils.PrintSuccess(fmt.Sprintf("Successfully updated %d package(s)", updatedCount))
+		utils.PrintSuccess("Successfully updated %d package(s)", updatedCount)
 
 		// Write lock file
 		if err := lockFile.Write(lockPath); err != nil {
-			utils.PrintWarning(fmt.Sprintf("Failed to write lock file: %s", err.Error()))
+			utils.PrintWarning("Failed to write lock file: %s", err.Error())
 		} else {
 			utils.PrintInfo("Updated ait.lock")
 		}

@@ -1,7 +1,12 @@
 package adapters
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/apex-ai/ait/internal/packages"
+	"github.com/apex-ai/ait/internal/utils"
 )
 
 // Adapter is the interface that all platform adapters must implement
@@ -56,4 +61,167 @@ func (b *BaseAdapter) Name() string {
 // GetConfigDir returns the configuration directory
 func (b *BaseAdapter) GetConfigDir() (string, error) {
 	return b.configDir, nil
+}
+
+// PackageInstallConfig holds configuration for package installation
+type PackageInstallConfig struct {
+	// TargetSubdir is the subdirectory within configDir (e.g., "agents", "skills", "prompts")
+	TargetSubdir string
+	// SourceFileName is the default source file name if not specified in package
+	SourceFileName string
+	// DestFileName is the destination file name (may include pkg.Name)
+	DestFileName string
+	// UsePackageSubdir indicates whether to create a subdirectory per package
+	UsePackageSubdir bool
+}
+
+// InstallPackageFile is a common helper for installing packages
+// It handles directory creation, file copying, and source file resolution
+func InstallPackageFile(pkg *packages.Package, configDir, adapterName string, cfg PackageInstallConfig) error {
+	var targetDir string
+
+	if cfg.UsePackageSubdir {
+		// Create per-package subdirectory (e.g., agents/package-name/)
+		targetDir = filepath.Join(configDir, cfg.TargetSubdir, pkg.Name)
+	} else {
+		// Use shared directory (e.g., prompts/)
+		targetDir = filepath.Join(configDir, cfg.TargetSubdir)
+	}
+
+	// Create directory
+	if err := utils.EnsureDir(targetDir); err != nil {
+		return fmt.Errorf("failed to create %s directory: %w", cfg.TargetSubdir, err)
+	}
+
+	// Get source file
+	sourceFile := pkg.GetFile(adapterName)
+	if sourceFile == "" {
+		sourceFile = cfg.SourceFileName
+	}
+
+	source := filepath.Join(pkg.Path, sourceFile)
+	dest := filepath.Join(targetDir, cfg.DestFileName)
+
+	// Copy file
+	if err := utils.CopyFile(source, dest); err != nil {
+		return fmt.Errorf("failed to install %s: %w", cfg.TargetSubdir, err)
+	}
+
+	return nil
+}
+
+// UninstallPackage is a common helper for uninstalling packages
+func UninstallPackage(pkg *packages.Package, configDir string, agentSubdir, skillSubdir, promptSubdir string) error {
+	var targetPath string
+
+	switch pkg.Type {
+	case packages.TypeAgent:
+		targetPath = filepath.Join(configDir, agentSubdir, pkg.Name)
+	case packages.TypeSkill:
+		targetPath = filepath.Join(configDir, skillSubdir, pkg.Name)
+	case packages.TypePrompt:
+		targetPath = filepath.Join(configDir, promptSubdir, pkg.Name+".txt")
+	default:
+		return fmt.Errorf("unsupported package type: %s", pkg.Type)
+	}
+
+	return os.RemoveAll(targetPath)
+}
+
+// ListPackages is a common helper for listing all installed packages
+func ListPackages(configDir string, agentSubdir, skillSubdir, promptSubdir string) ([]*packages.Package, error) {
+	installed := []*packages.Package{}
+
+	// List agents
+	agentsDir := filepath.Join(configDir, agentSubdir)
+	if agents, err := ListPackagesInDir(agentsDir, packages.TypeAgent); err == nil {
+		installed = append(installed, agents...)
+	}
+
+	// List skills
+	skillsDir := filepath.Join(configDir, skillSubdir)
+	if skills, err := ListPackagesInDir(skillsDir, packages.TypeSkill); err == nil {
+		installed = append(installed, skills...)
+	}
+
+	// List prompts
+	promptsDir := filepath.Join(configDir, promptSubdir)
+	if prompts, err := ListPromptsInDir(promptsDir); err == nil {
+		installed = append(installed, prompts...)
+	}
+
+	return installed, nil
+}
+
+// ListPackagesInDir lists packages in a directory (for agents and skills)
+func ListPackagesInDir(dir string, pkgType packages.PackageType) ([]*packages.Package, error) {
+	if !utils.DirExists(dir) {
+		return []*packages.Package{}, nil
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	pkgs := []*packages.Package{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			pkgs = append(pkgs, &packages.Package{
+				Name: entry.Name(),
+				Type: pkgType,
+				Path: filepath.Join(dir, entry.Name()),
+			})
+		}
+	}
+
+	return pkgs, nil
+}
+
+// ListPromptsInDir lists prompt packages in a directory
+func ListPromptsInDir(dir string) ([]*packages.Package, error) {
+	if !utils.DirExists(dir) {
+		return []*packages.Package{}, nil
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	pkgs := []*packages.Package{}
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".txt" {
+			name := entry.Name()[:len(entry.Name())-4] // Remove .txt extension
+			pkgs = append(pkgs, &packages.Package{
+				Name: name,
+				Type: packages.TypePrompt,
+				Path: filepath.Join(dir, entry.Name()),
+			})
+		}
+	}
+
+	return pkgs, nil
+}
+
+// ValidateConfigDir is a common helper for validating adapter configuration
+func ValidateConfigDir(configDir string, createIfMissing bool) error {
+	// Check if config directory exists
+	if !utils.DirExists(configDir) {
+		if createIfMissing {
+			// Try to create it
+			if err := utils.EnsureDir(configDir); err != nil {
+				return fmt.Errorf("config directory does not exist and cannot be created: %s", configDir)
+			}
+		} else {
+			return fmt.Errorf("config directory does not exist: %s", configDir)
+		}
+	}
+
+	// Check if writable
+	if err := utils.CheckDirWritable(configDir); err != nil {
+		return fmt.Errorf("config directory not writable: %w", err)
+	}
+
+	return nil
 }

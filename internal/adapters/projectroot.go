@@ -60,17 +60,17 @@ func (a *ProjectRootAdapter) InstallAgent(pkg *packages.Package) error {
 
 	// 1. Install for Cursor (.cursorrules at project root)
 	if err := a.installCursorRules(pkg, agentContent); err != nil {
-		utils.PrintWarning(fmt.Sprintf("Failed to create .cursorrules: %s", err.Error()))
+		utils.PrintWarning("Failed to create .cursorrules: %v", err)
 	}
 
 	// 2. Install for GitHub Copilot (.github/agents/<name>.agent.md)
 	if err := a.installGitHubCopilotAgent(pkg, agentContent); err != nil {
-		utils.PrintWarning(fmt.Sprintf("Failed to create .github/agents/%s.agent.md: %s", pkg.Name, err.Error()))
+		utils.PrintWarning("Failed to create .github/agents/%s.agent.md: %v", pkg.Name, err)
 	}
 
 	// 3. Install for OpenCode (proposed .opencode/agents/ convention)
 	if err := a.installOpenCodeAgent(pkg, agentContent); err != nil {
-		utils.PrintWarning(fmt.Sprintf("Failed to create .opencode/agents/: %s", err.Error()))
+		utils.PrintWarning("Failed to create .opencode/agents/: %v", err)
 	}
 
 	utils.PrintSuccess("Created project-level agent files:")
@@ -233,56 +233,82 @@ func (a *ProjectRootAdapter) Uninstall(pkg *packages.Package) error {
 	return nil
 }
 
-// List returns all installed packages (from .opencode/ directory)
+// List returns all installed packages from project-local installations
+// Checks .github/agents/, .opencode/, and .cursorrules
 func (a *ProjectRootAdapter) List() ([]*packages.Package, error) {
 	var pkgs []*packages.Package
 
-	opencodeDir := filepath.Join(a.projectRoot, ".opencode")
-	if _, err := os.Stat(opencodeDir); os.IsNotExist(err) {
-		return pkgs, nil
-	}
-
-	// List agents
-	agentsDir := filepath.Join(opencodeDir, "agents")
-	if dirs, err := os.ReadDir(agentsDir); err == nil {
-		for _, dir := range dirs {
-			if dir.IsDir() {
-				pkgs = append(pkgs, &packages.Package{
-					Name: dir.Name(),
-					Type: packages.TypeAgent,
-					Path: filepath.Join(agentsDir, dir.Name()),
-				})
-			}
-		}
-	}
-
-	// List skills
-	skillsDir := filepath.Join(opencodeDir, "skills")
-	if dirs, err := os.ReadDir(skillsDir); err == nil {
-		for _, dir := range dirs {
-			if dir.IsDir() {
-				pkgs = append(pkgs, &packages.Package{
-					Name: dir.Name(),
-					Type: packages.TypeSkill,
-					Path: filepath.Join(skillsDir, dir.Name()),
-				})
-			}
-		}
-	}
-
-	// List prompts
-	promptsDir := filepath.Join(opencodeDir, "prompts")
-	if files, err := os.ReadDir(promptsDir); err == nil {
+	// List from .github/agents/ (APM standard - primary source)
+	githubAgentsDir := filepath.Join(a.projectRoot, ".github", "agents")
+	if files, err := os.ReadDir(githubAgentsDir); err == nil {
 		for _, file := range files {
-			if !file.IsDir() {
-				name := file.Name()
-				ext := filepath.Ext(name)
-				pkgName := name[:len(name)-len(ext)]
+			if !file.IsDir() && strings.HasSuffix(file.Name(), ".agent.md") {
+				// Extract name from filename (remove .agent.md suffix)
+				name := strings.TrimSuffix(file.Name(), ".agent.md")
 				pkgs = append(pkgs, &packages.Package{
-					Name: pkgName,
-					Type: packages.TypePrompt,
-					Path: filepath.Join(promptsDir, name),
+					Name: name,
+					Type: packages.TypeAgent,
+					Path: filepath.Join(githubAgentsDir, file.Name()),
 				})
+			}
+		}
+	}
+
+	// List from .opencode/ (supplementary)
+	opencodeDir := filepath.Join(a.projectRoot, ".opencode")
+	if _, err := os.Stat(opencodeDir); err == nil {
+		// List agents
+		agentsDir := filepath.Join(opencodeDir, "agents")
+		if dirs, err := os.ReadDir(agentsDir); err == nil {
+			for _, dir := range dirs {
+				if dir.IsDir() {
+					// Check if we already have this package from .github/agents/
+					alreadyListed := false
+					for _, pkg := range pkgs {
+						if pkg.Name == dir.Name() && pkg.Type == packages.TypeAgent {
+							alreadyListed = true
+							break
+						}
+					}
+					if !alreadyListed {
+						pkgs = append(pkgs, &packages.Package{
+							Name: dir.Name(),
+							Type: packages.TypeAgent,
+							Path: filepath.Join(agentsDir, dir.Name()),
+						})
+					}
+				}
+			}
+		}
+
+		// List skills
+		skillsDir := filepath.Join(opencodeDir, "skills")
+		if dirs, err := os.ReadDir(skillsDir); err == nil {
+			for _, dir := range dirs {
+				if dir.IsDir() {
+					pkgs = append(pkgs, &packages.Package{
+						Name: dir.Name(),
+						Type: packages.TypeSkill,
+						Path: filepath.Join(skillsDir, dir.Name()),
+					})
+				}
+			}
+		}
+
+		// List prompts
+		promptsDir := filepath.Join(opencodeDir, "prompts")
+		if files, err := os.ReadDir(promptsDir); err == nil {
+			for _, file := range files {
+				if !file.IsDir() {
+					name := file.Name()
+					ext := filepath.Ext(name)
+					pkgName := name[:len(name)-len(ext)]
+					pkgs = append(pkgs, &packages.Package{
+						Name: pkgName,
+						Type: packages.TypePrompt,
+						Path: filepath.Join(promptsDir, name),
+					})
+				}
 			}
 		}
 	}

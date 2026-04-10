@@ -8,6 +8,7 @@ import (
 	"github.com/apex-ai/ait/internal/adapters"
 	"github.com/apex-ai/ait/internal/config"
 	"github.com/apex-ai/ait/internal/packages"
+	"github.com/apex-ai/ait/internal/resolver"
 	"github.com/apex-ai/ait/internal/sources"
 	"github.com/apex-ai/ait/internal/utils"
 	"github.com/spf13/cobra"
@@ -137,8 +138,15 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no valid target tools available")
 	}
 
-	// Parse and install each package
-	utils.PrintInfo(fmt.Sprintf("Installing %d package(s) to %d location(s)...", len(specsToInstall), len(targetAdapters)))
+	// Resolve dependencies (including transitive dependencies)
+	utils.PrintInfo("Resolving dependencies...")
+	depResolver := resolver.NewResolver()
+	resolvedPackages, err := depResolver.Resolve(specsToInstall)
+	if err != nil {
+		return fmt.Errorf("failed to resolve dependencies: %w", err)
+	}
+
+	utils.PrintInfo("Installing %d package(s) (including dependencies) to %d location(s)...", len(resolvedPackages), len(targetAdapters))
 
 	// Load or create lock file
 	lockPath := "ait.lock"
@@ -147,22 +155,42 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		var err error
 		lockFile, err = config.LoadLockFile(lockPath)
 		if err != nil {
-			utils.PrintWarning(fmt.Sprintf("Failed to load existing lock file: %s", err.Error()))
+			utils.PrintWarning("Failed to load existing lock file: %v", err)
 			lockFile = config.NewLockFile()
 		}
 	} else {
 		lockFile = config.NewLockFile()
 	}
 
+	// Install all resolved packages in topological order (dependencies first)
 	installedPackages := []installResult{}
+	installedCount := 0
 
-	for _, specStr := range specsToInstall {
-		result, err := installPackage(specStr, targetAdapters)
-		if err != nil {
-			utils.PrintError(fmt.Sprintf("Failed to install %s: %s", specStr, err.Error()))
-			continue
+	for _, pkg := range resolvedPackages {
+		utils.PrintInfo("Installing %s@%s...", pkg.Name, pkg.Version)
+
+		// Install to each target tool
+		for toolName, adapter := range targetAdapters {
+			if err := installToAdapter(pkg, adapter, toolName); err != nil {
+				utils.PrintWarning("Failed to install %s to %s: %v", pkg.Name, toolName, err)
+				continue
+			}
+			utils.PrintSuccess("Installed %s to %s", pkg.Name, toolName)
 		}
-		installedPackages = append(installedPackages, result)
+
+		installedCount++
+
+		// Create result for tracking
+		// Note: We don't have the original spec for transitive deps, so use constructed one
+		spec := &sources.PackageSpec{
+			Original: fmt.Sprintf("%s@%s", pkg.Name, pkg.Version),
+			Version:  pkg.Version,
+		}
+
+		installedPackages = append(installedPackages, installResult{
+			pkg:  pkg,
+			spec: spec,
+		})
 
 		// Add to lock file
 		installedToTools := []string{}
@@ -171,24 +199,24 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 
 		lockFile.AddPackage(
-			result.pkg.Name,
-			result.spec.Version,
-			string(result.pkg.Type),
-			result.spec.Original,
-			result.pkg.Version,
+			pkg.Name,
+			pkg.Version,
+			string(pkg.Type),
+			spec.Original,
+			pkg.Version,
 			installedToTools,
 		)
 	}
 
-	if len(installedPackages) == 0 {
+	if installedCount == 0 {
 		return fmt.Errorf("no packages were installed successfully")
 	}
 
-	utils.PrintSuccess(fmt.Sprintf("Successfully installed %d package(s)", len(installedPackages)))
+	utils.PrintSuccess("Successfully installed %d package(s)", installedCount)
 
 	// Write lock file
 	if err := lockFile.Write(lockPath); err != nil {
-		utils.PrintWarning(fmt.Sprintf("Failed to write lock file: %s", err.Error()))
+		utils.PrintWarning("Failed to write lock file: %v", err)
 	} else {
 		utils.PrintInfo("Updated ait.lock")
 	}
@@ -196,7 +224,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	// Auto-save to ait.yml if installing from command line and save flag is true
 	if installingFromCommandLine && installSave {
 		if err := saveToManifest(installedPackages); err != nil {
-			utils.PrintWarning(fmt.Sprintf("Failed to save to ait.yml: %s", err.Error()))
+			utils.PrintWarning("Failed to save to ait.yml: %v", err)
 		}
 	}
 
@@ -205,7 +233,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 // installPackage fetches and installs a single package to all target adapters
 func installPackage(specStr string, targetAdapters map[string]adapters.Adapter) (installResult, error) {
-	utils.PrintInfo(fmt.Sprintf("Installing %s...", specStr))
+	utils.PrintInfo("Installing %s...", specStr)
 
 	// Parse package spec
 	spec, err := sources.ParsePackageSpec(specStr)
@@ -228,10 +256,10 @@ func installPackage(specStr string, targetAdapters map[string]adapters.Adapter) 
 	// Install to each target tool
 	for toolName, adapter := range targetAdapters {
 		if err := installToAdapter(pkg, adapter, toolName); err != nil {
-			utils.PrintWarning(fmt.Sprintf("Failed to install to %s: %s", toolName, err.Error()))
+			utils.PrintWarning("Failed to install to %s: %v", toolName, err)
 			continue
 		}
-		utils.PrintSuccess(fmt.Sprintf("Installed %s to %s", pkg.Name, toolName))
+		utils.PrintSuccess("Installed %s to %s", pkg.Name, toolName)
 	}
 
 	return installResult{pkg: pkg, spec: spec}, nil
@@ -267,7 +295,7 @@ func getGlobalAdapters(targets []string) (map[string]adapters.Adapter, error) {
 			return nil, fmt.Errorf("no AI tools detected. Install OpenCode, Cursor, or Claude Desktop first")
 		}
 		targets = detectedTools
-		utils.PrintInfo(fmt.Sprintf("Found tools: %v", targets))
+		utils.PrintInfo("Found tools: %v", targets)
 	}
 
 	// Create adapters for target tools
@@ -275,7 +303,7 @@ func getGlobalAdapters(targets []string) (map[string]adapters.Adapter, error) {
 	for _, target := range targets {
 		adapter, err := adapters.GetAdapter(target)
 		if err != nil {
-			utils.PrintWarning(fmt.Sprintf("Skipping %s: %s", target, err.Error()))
+			utils.PrintWarning("Skipping %s: %v", target, err)
 			continue
 		}
 		targetAdapters[target] = adapter
@@ -361,7 +389,7 @@ func saveToManifest(installedPackages []installResult) error {
 	}
 
 	if newDepsAdded > 0 {
-		utils.PrintSuccess(fmt.Sprintf("Added %d package(s) to ait.yml", newDepsAdded))
+		utils.PrintSuccess("Added %d package(s) to ait.yml", newDepsAdded)
 	} else {
 		utils.PrintInfo("All packages already in ait.yml")
 	}
