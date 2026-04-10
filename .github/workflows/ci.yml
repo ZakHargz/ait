@@ -62,6 +62,9 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
+    - name: Debug go.mod
+      run: cat go.mod | head -5
+
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
