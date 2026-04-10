@@ -231,40 +231,6 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// installPackage fetches and installs a single package to all target adapters
-func installPackage(specStr string, targetAdapters map[string]adapters.Adapter) (installResult, error) {
-	utils.PrintInfo("Installing %s...", specStr)
-
-	// Parse package spec
-	spec, err := sources.ParsePackageSpec(specStr)
-	if err != nil {
-		return installResult{}, fmt.Errorf("invalid package spec: %w", err)
-	}
-
-	// Get appropriate source
-	source, err := sources.GetSource(*spec)
-	if err != nil {
-		return installResult{}, fmt.Errorf("failed to get source: %w", err)
-	}
-
-	// Fetch package
-	pkg, err := source.Fetch(*spec)
-	if err != nil {
-		return installResult{}, fmt.Errorf("failed to fetch package: %w", err)
-	}
-
-	// Install to each target tool
-	for toolName, adapter := range targetAdapters {
-		if err := installToAdapter(pkg, adapter, toolName); err != nil {
-			utils.PrintWarning("Failed to install to %s: %v", toolName, err)
-			continue
-		}
-		utils.PrintSuccess("Installed %s to %s", pkg.Name, toolName)
-	}
-
-	return installResult{pkg: pkg, spec: spec}, nil
-}
-
 // installToAdapter installs a package using the appropriate adapter method based on package type
 func installToAdapter(pkg *packages.Package, adapter adapters.Adapter, toolName string) error {
 	switch pkg.Type {
