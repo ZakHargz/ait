@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/apex-ai/ait/internal/adapters"
 	"github.com/apex-ai/ait/internal/config"
@@ -17,14 +18,20 @@ var installCmd = &cobra.Command{
 	Short: "Install packages from ait.yml or specific package specs",
 	Long: `Install packages defined in ait.yml or install specific packages.
 
+When installing specific packages from the command line, they are automatically
+saved to ait.yml (creating it if it doesn't exist). This matches APM behavior.
+
 Examples:
   # Install all dependencies from ait.yml
   ait install
 
-  # Install specific packages (GitHub shorthand - recommended)
+  # Install specific packages (creates/updates ait.yml automatically)
   ait install org/repo/agents/code-reviewer@1.0.0
   ait install org/repo/skills/python@^2.0.0
   ait install gitlab.com/org/repo/agents/helper
+
+  # Install without saving to ait.yml
+  ait install org/repo/agents/code-reviewer --save=false
 
   # Install with explicit prefixes (legacy format)
   ait install github:org/repo/agents/code-reviewer@1.0.0
@@ -68,16 +75,18 @@ func init() {
 	rootCmd.AddCommand(installCmd)
 
 	installCmd.Flags().StringSliceVarP(&installTargets, "target", "t", []string{}, "target tools to install to (opencode, cursor, claude, project)")
-	installCmd.Flags().BoolVarP(&installSave, "save", "s", false, "save installed packages to ait.yml")
+	installCmd.Flags().BoolVarP(&installSave, "save", "s", true, "save installed packages to ait.yml (default: true)")
 	installCmd.Flags().BoolVarP(&installGlobal, "global", "g", false, "install globally to AI tools instead of project-local .ait/")
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
 	var specsToInstall []string
+	var installingFromCommandLine bool
 
 	if len(args) > 0 {
 		// Install specific packages from command line
 		specsToInstall = args
+		installingFromCommandLine = true
 	} else {
 		// Install from ait.yml
 		manifestPath := "ait.yml"
@@ -103,6 +112,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		if len(installTargets) == 0 && len(manifest.Targets) > 0 {
 			installTargets = manifest.Targets
 		}
+		installingFromCommandLine = false
 	}
 
 	// Determine installation mode: project-local or global
@@ -181,6 +191,13 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		utils.PrintWarning(fmt.Sprintf("Failed to write lock file: %s", err.Error()))
 	} else {
 		utils.PrintInfo("Updated ait.lock")
+	}
+
+	// Auto-save to ait.yml if installing from command line and save flag is true
+	if installingFromCommandLine && installSave {
+		if err := saveToManifest(installedPackages); err != nil {
+			utils.PrintWarning(fmt.Sprintf("Failed to save to ait.yml: %s", err.Error()))
+		}
 	}
 
 	return nil
@@ -287,4 +304,67 @@ func getProjectLocalAdapters() (map[string]adapters.Adapter, error) {
 	return map[string]adapters.Adapter{
 		"project-root": projectRootAdapter,
 	}, nil
+}
+
+// saveToManifest saves installed packages to ait.yml, creating it if it doesn't exist
+func saveToManifest(installedPackages []installResult) error {
+	manifestPath := "ait.yml"
+	var manifest *config.Manifest
+
+	// Load existing manifest or create new one
+	if config.ManifestExists(manifestPath) {
+		var err error
+		manifest, err = config.LoadManifest(manifestPath)
+		if err != nil {
+			return fmt.Errorf("failed to load existing ait.yml: %w", err)
+		}
+	} else {
+		// Create new manifest with defaults
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+
+		// Get directory name for project name
+		projectName := filepath.Base(cwd)
+
+		manifest = &config.Manifest{
+			Name:         projectName,
+			Version:      "1.0.0",
+			Dependencies: []string{},
+			Targets:      []string{},
+		}
+
+		utils.PrintInfo("Creating ait.yml...")
+	}
+
+	// Add new dependencies (avoid duplicates)
+	existingDeps := make(map[string]bool)
+	for _, dep := range manifest.Dependencies {
+		existingDeps[dep] = true
+	}
+
+	newDepsAdded := 0
+	for _, result := range installedPackages {
+		// Use the original package spec string
+		depSpec := result.spec.Original
+
+		if !existingDeps[depSpec] {
+			manifest.Dependencies = append(manifest.Dependencies, depSpec)
+			newDepsAdded++
+		}
+	}
+
+	// Write manifest
+	if err := manifest.Write(manifestPath); err != nil {
+		return fmt.Errorf("failed to write ait.yml: %w", err)
+	}
+
+	if newDepsAdded > 0 {
+		utils.PrintSuccess(fmt.Sprintf("Added %d package(s) to ait.yml", newDepsAdded))
+	} else {
+		utils.PrintInfo("All packages already in ait.yml")
+	}
+
+	return nil
 }

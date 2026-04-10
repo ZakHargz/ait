@@ -138,18 +138,27 @@ Note: The `github:` prefix is required in legacy format. We recommend migrating 
 ### 4. Install Packages
 
 ```bash
-# Install all dependencies from ait.yml to project root (default)
+# Install specific packages (automatically creates/updates ait.yml)
+ait install org/repo/agents/code-reviewer
+ait install org/repo/skills/python@^2.0.0
+
+# Install all dependencies from ait.yml
 ait install
 
-# Or install specific packages
-ait install github:org/repo/agents/code-reviewer
+# Install without saving to ait.yml
+ait install org/repo/agents/reviewer --save=false
 
 # Install globally to AI tools instead
-ait install --global
+ait install --global org/repo/agents/reviewer
 
 # Install to specific tools only
-ait install --target opencode
+ait install --target opencode org/repo/agents/reviewer
 ```
+
+**New APM-like Behavior**: When you install a package from the command line, AIT automatically:
+1. Creates `ait.yml` if it doesn't exist (using current directory name as project name)
+2. Adds the package to the dependencies list
+3. Creates tool-native files at your project root
 
 This creates tool-native files at your project root:
 - `.cursorrules` - Auto-detected by Cursor
@@ -468,26 +477,27 @@ ait init --name my-project --version 1.0.0
 Install packages:
 
 ```bash
-# Install from ait.yml to project root (default)
+# Install specific packages (auto-creates/updates ait.yml)
+ait install org/repo/agents/reviewer
+ait install org/repo/skills/python@^2.0.0
+
+# Install all dependencies from ait.yml
 ait install
 
-# Install specific packages to project root
-ait install github:org/repo/agents/reviewer
+# Install without saving to ait.yml
+ait install org/repo/agents/reviewer --save=false
 
 # Install globally to AI tools
-ait install --global
+ait install --global org/repo/agents/reviewer
 
 # Install to specific tools
-ait install --target opencode --target cursor
-
-# Save installed packages to ait.yml
-ait install github:org/repo/agents/reviewer --save
+ait install --target opencode --target cursor org/repo/agents/reviewer
 ```
 
 **Flags:**
 - `--global` or `-g` - Install to AI tools globally instead of project root
 - `--target` or `-t` - Specify which tools to install to
-- `--save` or `-s` - Add installed packages to ait.yml
+- `--save` or `-s` - Add installed packages to ait.yml (default: true, use --save=false to disable)
 
 ### ait list
 
