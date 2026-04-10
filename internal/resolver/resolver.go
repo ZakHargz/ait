@@ -3,7 +3,6 @@ package resolver
 import (
 	"fmt"
 
-	"github.com/apex-ai/ait/internal/config"
 	"github.com/apex-ai/ait/internal/packages"
 	"github.com/apex-ai/ait/internal/sources"
 )

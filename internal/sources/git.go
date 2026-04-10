@@ -17,6 +17,8 @@ import (
 type GitSource struct {
 	// CacheDir is the root directory for cached repositories
 	CacheDir string
+	// AuthResolver handles authentication for git operations
+	authResolver *AuthResolver
 }
 
 // NewGitSource creates a new GitSource with the specified cache directory
@@ -28,7 +30,8 @@ func NewGitSource(cacheDir string) *GitSource {
 	}
 
 	return &GitSource{
-		CacheDir: cacheDir,
+		CacheDir:     cacheDir,
+		authResolver: NewAuthResolver(),
 	}
 }
 
@@ -125,6 +128,9 @@ func (gs *GitSource) getRepoCachePath(spec PackageSpec) string {
 
 // ensureRepo clones the repository if it doesn't exist, or fetches updates if it does
 func (gs *GitSource) ensureRepo(repoURL, repoPath string) (*git.Repository, error) {
+	// Get authentication for this repository
+	auth := gs.authResolver.GetAuth(repoURL)
+
 	// Check if repository already exists
 	if utils.DirExists(repoPath) {
 		// Open existing repository
@@ -137,6 +143,7 @@ func (gs *GitSource) ensureRepo(repoURL, repoPath string) (*git.Repository, erro
 		utils.PrintInfo("Updating repository cache...")
 		err = repo.Fetch(&git.FetchOptions{
 			RemoteName: "origin",
+			Auth:       auth,
 			Force:      true,
 			Tags:       git.AllTags,
 		})
@@ -157,6 +164,7 @@ func (gs *GitSource) ensureRepo(repoURL, repoPath string) (*git.Repository, erro
 
 	repo, err := git.PlainClone(repoPath, false, &git.CloneOptions{
 		URL:      repoURL,
+		Auth:     auth,
 		Progress: nil, // Could add progress bar here
 		Tags:     git.AllTags,
 	})
@@ -169,14 +177,40 @@ func (gs *GitSource) ensureRepo(repoURL, repoPath string) (*git.Repository, erro
 
 // resolveVersion resolves a version constraint to a specific git reference
 // Supports:
-//   - "latest" -> highest semver tag
+//   - "latest" -> HEAD of default branch (master or main)
+//   - "latest-tag" -> highest semver tag
 //   - Exact versions: "1.0.0" -> tag "v1.0.0"
 //   - Semver constraints: "^1.0.0", "~1.2.0" -> matching tags
 //   - Branch names: "main", "develop"
 //   - Commit hashes: "abc123..."
 func (gs *GitSource) resolveVersion(repo *git.Repository, versionSpec string) (string, error) {
-	// Handle "latest" - find the highest semver tag
+	// Handle "latest" - use HEAD of default branch (master or main)
 	if versionSpec == "latest" {
+		branches, err := repo.Branches()
+		if err == nil {
+			var foundBranch string
+			branches.ForEach(func(ref *plumbing.Reference) error {
+				branchName := ref.Name().Short()
+				// Prefer main over master if both exist
+				if branchName == "main" {
+					foundBranch = "main"
+					return nil
+				}
+				if branchName == "master" && foundBranch == "" {
+					foundBranch = "master"
+				}
+				return nil
+			})
+			if foundBranch != "" {
+				return foundBranch, nil
+			}
+		}
+		// Fallback to master
+		return "master", nil
+	}
+
+	// Handle "latest-tag" - find the highest semver tag
+	if versionSpec == "latest-tag" {
 		tags, err := gs.getTags(repo)
 		if err != nil {
 			return "", fmt.Errorf("failed to list tags: %w", err)
@@ -203,8 +237,8 @@ func (gs *GitSource) resolveVersion(repo *git.Repository, versionSpec string) (s
 			return latestTag, nil
 		}
 
-		// If no semver tags found, use default branch (main or master)
-		return "main", nil
+		// If no semver tags found, fallback to "latest" behavior
+		return gs.resolveVersion(repo, "latest")
 	}
 
 	// If it looks like a commit hash, use it directly
@@ -327,13 +361,44 @@ func (gs *GitSource) checkout(repo *git.Repository, ref string) error {
 		})
 	}
 
-	// Try as branch
-	branchRef := plumbing.NewBranchReferenceName(ref)
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: branchRef,
-	})
+	// Try as remote branch (origin/ref) first to avoid detached HEAD
+	remoteBranchRef := plumbing.NewRemoteReferenceName("origin", ref)
+	remoteRef, err := repo.Reference(remoteBranchRef, true)
 	if err == nil {
-		return nil
+		// Create/update local branch to track remote
+		localBranchRef := plumbing.NewBranchReferenceName(ref)
+
+		// Check if local branch exists
+		_, err := repo.Reference(localBranchRef, false)
+		if err != nil {
+			// Create new local branch tracking remote
+			newRef := plumbing.NewHashReference(localBranchRef, remoteRef.Hash())
+			err = repo.Storer.SetReference(newRef)
+			if err != nil {
+				return fmt.Errorf("failed to create local branch: %w", err)
+			}
+		}
+
+		// Checkout the local branch (this will track the remote)
+		err = w.Checkout(&git.CheckoutOptions{
+			Branch: localBranchRef,
+		})
+		if err == nil {
+			// Update to remote HEAD
+			return w.Reset(&git.ResetOptions{
+				Commit: remoteRef.Hash(),
+				Mode:   git.HardReset,
+			})
+		}
+	}
+
+	// Try as local branch
+	branchRef := plumbing.NewBranchReferenceName(ref)
+	_, err = repo.Reference(branchRef, false)
+	if err == nil {
+		return w.Checkout(&git.CheckoutOptions{
+			Branch: branchRef,
+		})
 	}
 
 	// Try as commit hash

@@ -14,6 +14,7 @@ A CLI package manager for AI agents, skills, prompts, and MCP servers. Think npm
 - 📌 **Lock Files** - Reproducible installations with `ait.lock`
 - 🏷️ **Semantic Versioning** - Optional version constraints (`^1.0.0`, `~2.1.0`, or omit for latest)
 - 🌍 **Multiple Sources** - GitHub, GitLab, generic Git, or local packages
+- 🔐 **Private Repository Support** - Authenticate with GitHub tokens for private packages ([docs](docs/AUTHENTICATION.md))
 - 💾 **Smart Caching** - Local cache to speed up installations
 
 ## Installation
@@ -73,7 +74,22 @@ targets:
   - opencode
 ```
 
-### 2. Add Dependencies
+### 2. Authentication for Private Repositories (Optional)
+
+If you're using private GitHub repositories, set up authentication:
+
+```bash
+# Use GitHub CLI (easiest)
+gh auth login
+export GH_TOKEN=$(gh auth token)
+
+# Or set a personal access token
+export GITHUB_TOKEN=ghp_your_token_here
+```
+
+For detailed authentication setup, see [Authentication Guide](docs/AUTHENTICATION.md).
+
+### 3. Add Dependencies
 
 Edit `ait.yml` to add packages as a simple flat list:
 
@@ -119,7 +135,7 @@ dependencies:
 Note: The `github:` prefix is required in legacy format. We recommend migrating to the flat list format above.
 </details>
 
-### 3. Install Packages
+### 4. Install Packages
 
 ```bash
 # Install all dependencies from ait.yml to project root (default)
@@ -142,7 +158,7 @@ This creates tool-native files at your project root:
 
 **Team Workflow**: Commit these files to git! Your team gets AI agents automatically when they clone the repo - no `ait` commands needed.
 
-### 4. Share with Your Team (Optional)
+### 5. Share with Your Team (Optional)
 
 Commit the generated tool-native files to git:
 
@@ -157,7 +173,7 @@ When teammates clone the repo:
 - **GitHub Copilot** auto-loads `.github/copilot-instructions.md` immediately
 - **OpenCode** can load from `.opencode/agents/` (or run `ait sync` if needed)
 
-### 5. List Installed Packages
+### 6. List Installed Packages
 
 ```bash
 # List all installed packages
@@ -167,7 +183,7 @@ ait list
 ait list --target opencode
 ```
 
-### 6. Update Packages
+### 7. Update Packages
 
 ```bash
 # Update all packages to latest compatible versions
@@ -180,7 +196,7 @@ ait update code-reviewer python-skill
 ait update --target opencode
 ```
 
-### 7. Uninstall Packages
+### 8. Uninstall Packages
 
 ```bash
 # Uninstall a package from project root
