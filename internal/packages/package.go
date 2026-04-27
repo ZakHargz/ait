@@ -1,6 +1,9 @@
 package packages
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/apex-ai/ait/internal/config"
 )
 
@@ -23,21 +26,49 @@ type Package struct {
 	Metadata *config.PackageMetadata
 }
 
-// GetFile returns the platform-specific file for this package
+// GetFile returns the platform-specific file for this package.
+// For APM-compatible packages that may not have the standard file name,
+// it walks a list of candidates and returns the first one that exists on disk.
 func (p *Package) GetFile(platform string) string {
 	if p.Metadata != nil {
-		return p.Metadata.GetFile(platform)
+		// If the metadata explicitly maps this platform, trust it.
+		if file, ok := p.Metadata.Files[platform]; ok {
+			return file
+		}
 	}
 
-	// Return default based on type
-	switch p.Type {
+	// Build candidate list based on normalised type, falling back through
+	// common APM-compatible names so hybrid packages install cleanly.
+	var candidates []string
+	switch p.effectiveType() {
 	case TypeAgent:
-		return "AGENT.md"
+		candidates = []string{"AGENT.md", "README.md", "INSTRUCTIONS.md"}
 	case TypeSkill:
-		return "SKILL.md"
+		candidates = []string{"SKILL.md", "README.md"}
 	case TypePrompt:
-		return "prompt.txt"
+		candidates = []string{"prompt.txt", "PROMPT.md"}
 	default:
 		return ""
 	}
+
+	// Return the first candidate that actually exists on disk.
+	for _, name := range candidates {
+		if p.Path != "" {
+			if _, err := os.Stat(filepath.Join(p.Path, name)); err == nil {
+				return name
+			}
+		}
+	}
+
+	// Nothing found on disk — return the canonical default so callers get a
+	// meaningful error rather than an empty string.
+	return candidates[0]
+}
+
+// effectiveType returns the package type, normalising APM hybrid → agent.
+func (p *Package) effectiveType() PackageType {
+	if p.Metadata != nil {
+		return p.Metadata.NormaliseType()
+	}
+	return p.Type
 }

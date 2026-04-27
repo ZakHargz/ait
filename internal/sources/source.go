@@ -94,6 +94,13 @@ func ParsePackageSpec(spec string) (*PackageSpec, error) {
 		}
 	}
 
+	// Normalise APM-style '#' version separator to '@' so the rest of the
+	// resolver works uniformly. APM uses e.g. "microsoft/pkg#v1.0.0".
+	// Only replace the first '#' that isn't part of a URL fragment.
+	if idx := strings.Index(remainder, "#"); idx >= 0 {
+		remainder = remainder[:idx] + "@" + remainder[idx+1:]
+	}
+
 	// Split by @ to get version (optional)
 	pathParts := strings.SplitN(remainder, "@", 2)
 	pathStr := pathParts[0]

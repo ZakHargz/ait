@@ -15,6 +15,9 @@ const (
 	PackageTypeSkill  PackageType = "skill"
 	PackageTypePrompt PackageType = "prompt"
 	PackageTypeMCP    PackageType = "mcp"
+	// PackageTypeHybrid is an APM-compatible type for packages that combine
+	// instructions, skills and prompts. AIT treats it as an agent.
+	PackageTypeHybrid PackageType = "hybrid"
 )
 
 // PackageMetadata represents the package.yml metadata file
@@ -79,11 +82,32 @@ func (p *PackageMetadata) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// Author represents package author information
+// Author represents package author information.
+// Supports both struct form { name: ..., email: ... } and plain string form "Name <email>".
 type Author struct {
 	Name  string `yaml:"name"`
 	Email string `yaml:"email,omitempty"`
 	URL   string `yaml:"url,omitempty"`
+}
+
+// UnmarshalYAML allows Author to be specified as either a mapping or a plain string.
+func (a *Author) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		// Plain string: "Author Name" or "Author Name <email>"
+		a.Name = node.Value
+		return nil
+	case yaml.MappingNode:
+		type authorRaw Author
+		var raw authorRaw
+		if err := node.Decode(&raw); err != nil {
+			return err
+		}
+		*a = Author(raw)
+		return nil
+	default:
+		return fmt.Errorf("cannot unmarshal author field")
+	}
 }
 
 // Requirements represents minimum version requirements
@@ -96,6 +120,22 @@ type Repository struct {
 	Type      string `yaml:"type"`
 	URL       string `yaml:"url"`
 	Directory string `yaml:"directory,omitempty"`
+}
+
+// packageMetadataCandidates is the ordered list of metadata filenames AIT looks for
+// inside a package directory. package.yml is the native format; apm.yml is the APM fallback.
+var packageMetadataCandidates = []string{"package.yml", "apm.yml"}
+
+// FindPackageMetadata searches pkgDir for a supported metadata file and loads it.
+// It tries package.yml first, then apm.yml.
+func FindPackageMetadata(pkgDir string) (*PackageMetadata, error) {
+	for _, name := range packageMetadataCandidates {
+		path := pkgDir + "/" + name
+		if _, err := os.Stat(path); err == nil {
+			return LoadPackageMetadata(path)
+		}
+	}
+	return nil, fmt.Errorf("no package metadata found in %s (looked for: package.yml, apm.yml)", pkgDir)
 }
 
 // LoadPackageMetadata loads package.yml from the specified path
@@ -127,14 +167,25 @@ func (p *PackageMetadata) Write(path string) error {
 	return nil
 }
 
+// NormaliseType maps APM-compatible types to the closest AIT equivalent.
+// hybrid → agent (instructions + prompts bundle, installed like an agent).
+func (p *PackageMetadata) NormaliseType() PackageType {
+	switch p.Type {
+	case PackageTypeHybrid:
+		return PackageTypeAgent
+	default:
+		return p.Type
+	}
+}
+
 // GetFile returns the platform-specific file path
 func (p *PackageMetadata) GetFile(platform string) string {
 	if file, ok := p.Files[platform]; ok {
 		return file
 	}
 
-	// Return default based on type
-	switch p.Type {
+	// Return default based on normalised type
+	switch p.NormaliseType() {
 	case PackageTypeAgent:
 		return "AGENT.md"
 	case PackageTypeSkill:

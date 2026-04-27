@@ -131,3 +131,29 @@ func ManifestExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+// ManifestCandidates is the ordered list of manifest filenames AIT will look for.
+// ait.yml takes priority; apm.yml is the APM-compatible fallback.
+var ManifestCandidates = []string{"ait.yml", "apm.yml"}
+
+// FindManifest searches the current directory for a supported manifest file,
+// returning the path of the first one found. Returns an error if none exist.
+func FindManifest() (string, error) {
+	for _, name := range ManifestCandidates {
+		if ManifestExists(name) {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("no manifest found (looked for: %s). Run 'ait init' to create one", joinNames(ManifestCandidates))
+}
+
+func joinNames(names []string) string {
+	result := ""
+	for i, n := range names {
+		if i > 0 {
+			result += ", "
+		}
+		result += n
+	}
+	return result
+}

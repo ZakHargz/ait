@@ -63,22 +63,17 @@ func (gs *GitSource) Fetch(spec PackageSpec) (*packages.Package, error) {
 	// Get package path within repository
 	pkgPath := filepath.Join(repoPath, spec.Path)
 
-	// Read package metadata
-	metadataPath := filepath.Join(pkgPath, "package.yml")
-	if !utils.FileExists(metadataPath) {
-		return nil, fmt.Errorf("package.yml not found at %s", metadataPath)
-	}
-
-	metadata, err := config.LoadPackageMetadata(metadataPath)
+	// Read package metadata — tries package.yml first, then apm.yml
+	metadata, err := config.FindPackageMetadata(pkgPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load package metadata: %w", err)
+		return nil, fmt.Errorf("failed to fetch package: %w", err)
 	}
 
 	// Create package struct
 	pkg := &packages.Package{
 		Name:     metadata.Name,
 		Version:  metadata.Version,
-		Type:     metadata.Type,
+		Type:     metadata.NormaliseType(),
 		Path:     pkgPath,
 		Metadata: metadata,
 	}
@@ -439,22 +434,17 @@ func (ls *LocalSource) Fetch(spec PackageSpec) (*packages.Package, error) {
 		return nil, fmt.Errorf("package path does not exist: %s", pkgPath)
 	}
 
-	// Read package metadata
-	metadataPath := filepath.Join(pkgPath, "package.yml")
-	if !utils.FileExists(metadataPath) {
-		return nil, fmt.Errorf("package.yml not found at %s", metadataPath)
-	}
-
-	metadata, err := config.LoadPackageMetadata(metadataPath)
+	// Read package metadata — tries package.yml first, then apm.yml
+	metadata, err := config.FindPackageMetadata(pkgPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load package metadata: %w", err)
+		return nil, fmt.Errorf("failed to fetch package: %w", err)
 	}
 
 	// Create package struct
 	pkg := &packages.Package{
 		Name:     metadata.Name,
 		Version:  metadata.Version,
-		Type:     metadata.Type,
+		Type:     metadata.NormaliseType(),
 		Path:     pkgPath,
 		Metadata: metadata,
 	}

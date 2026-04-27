@@ -84,20 +84,25 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	var specsToInstall []string
 	var installingFromCommandLine bool
 
+	// manifestPath tracks which manifest file is active so later steps
+	// (auto-save) write back to the same file.
+	manifestPath := "ait.yml"
+
 	if len(args) > 0 {
 		// Install specific packages from command line
 		specsToInstall = args
 		installingFromCommandLine = true
 	} else {
-		// Install from ait.yml
-		manifestPath := "ait.yml"
-		if !config.ManifestExists(manifestPath) {
-			return fmt.Errorf("no ait.yml found. Run 'ait init' first or provide package specs")
+		// Install from manifest — support both ait.yml and apm.yml
+		var err error
+		manifestPath, err = config.FindManifest()
+		if err != nil {
+			return fmt.Errorf("%w\nRun 'ait init' to create one or provide package specs as arguments", err)
 		}
 
 		manifest, err := config.LoadManifest(manifestPath)
 		if err != nil {
-			return fmt.Errorf("failed to load ait.yml: %w", err)
+			return fmt.Errorf("failed to load %s: %w", manifestPath, err)
 		}
 
 		// Collect all dependencies (now a simple flat list)
@@ -221,10 +226,10 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		utils.PrintInfo("Updated ait.lock")
 	}
 
-	// Auto-save to ait.yml if installing from command line and save flag is true
+	// Auto-save to manifest if installing from command line and save flag is true
 	if installingFromCommandLine && installSave {
-		if err := saveToManifest(installedPackages); err != nil {
-			utils.PrintWarning("Failed to save to ait.yml: %v", err)
+		if err := saveToManifest(installedPackages, manifestPath); err != nil {
+			utils.PrintWarning("Failed to save to %s: %v", manifestPath, err)
 		}
 	}
 
@@ -300,9 +305,15 @@ func getProjectLocalAdapters() (map[string]adapters.Adapter, error) {
 	}, nil
 }
 
-// saveToManifest saves installed packages to ait.yml, creating it if it doesn't exist
-func saveToManifest(installedPackages []installResult) error {
-	manifestPath := "ait.yml"
+// saveToManifest saves installed packages to the given manifest file (ait.yml or apm.yml),
+// creating ait.yml if no manifest exists yet.
+func saveToManifest(installedPackages []installResult, manifestPath string) error {
+	// If no manifest path was determined (command-line install in a fresh dir),
+	// default to ait.yml.
+	if manifestPath == "" {
+		manifestPath = "ait.yml"
+	}
+
 	var manifest *config.Manifest
 
 	// Load existing manifest or create new one
@@ -310,9 +321,12 @@ func saveToManifest(installedPackages []installResult) error {
 		var err error
 		manifest, err = config.LoadManifest(manifestPath)
 		if err != nil {
-			return fmt.Errorf("failed to load existing ait.yml: %w", err)
+			return fmt.Errorf("failed to load existing %s: %w", manifestPath, err)
 		}
 	} else {
+		// Creating a new manifest — always use ait.yml regardless of manifestPath
+		manifestPath = "ait.yml"
+
 		// Create new manifest with defaults
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -351,13 +365,13 @@ func saveToManifest(installedPackages []installResult) error {
 
 	// Write manifest
 	if err := manifest.Write(manifestPath); err != nil {
-		return fmt.Errorf("failed to write ait.yml: %w", err)
+		return fmt.Errorf("failed to write %s: %w", manifestPath, err)
 	}
 
 	if newDepsAdded > 0 {
-		utils.PrintSuccess("Added %d package(s) to ait.yml", newDepsAdded)
+		utils.PrintSuccess("Added %d package(s) to %s", newDepsAdded, manifestPath)
 	} else {
-		utils.PrintInfo("All packages already in ait.yml")
+		utils.PrintInfo("All packages already in %s", manifestPath)
 	}
 
 	return nil

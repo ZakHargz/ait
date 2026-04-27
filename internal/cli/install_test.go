@@ -117,7 +117,7 @@ func TestSaveToManifest(t *testing.T) {
 	}
 
 	// This should create ait.yml
-	err := saveToManifest(results)
+	err := saveToManifest(results, "ait.yml")
 	if err != nil {
 		t.Fatalf("saveToManifest() failed: %v", err)
 	}
@@ -160,7 +160,7 @@ dependencies:
 	}
 
 	// Save with empty results (should not modify existing deps)
-	err = saveToManifest([]installResult{})
+	err = saveToManifest([]installResult{}, "ait.yml")
 	if err != nil {
 		t.Fatalf("saveToManifest() failed: %v", err)
 	}
