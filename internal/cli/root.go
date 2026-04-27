@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const version = "0.10.0"
+const version = "0.11.0"
 
 var rootCmd = &cobra.Command{
 	Use:   "ait",

@@ -49,11 +49,17 @@ func (a *ProjectRootAdapter) GetConfigDir() (string, error) {
 // - .github/agents/<name>.agent.md (for GitHub Copilot, VS Code, IntelliJ - APM standard)
 // - .opencode/agents/<name>/ (for OpenCode)
 func (a *ProjectRootAdapter) InstallAgent(pkg *packages.Package) error {
-	// Read AGENT.md content
-	agentFile := filepath.Join(pkg.Path, "AGENT.md")
-	content, err := os.ReadFile(agentFile)
+	// Resolve agent content — prefer APM .apm/agents/ layout over root-level AGENT.md.
+	var agentSource string
+	if pkg.ApmAgentFile != "" {
+		agentSource = pkg.ApmAgentFile
+	} else {
+		agentSource = filepath.Join(pkg.Path, "AGENT.md")
+	}
+
+	content, err := os.ReadFile(agentSource)
 	if err != nil {
-		return fmt.Errorf("AGENT.md not found: %w", err)
+		return fmt.Errorf("failed to install agents: failed to open source file: %w", err)
 	}
 
 	agentContent := string(content)
@@ -149,14 +155,22 @@ func (a *ProjectRootAdapter) installOpenCodeAgent(pkg *packages.Package, agentCo
 
 // InstallSkill installs a skill (not all tools support skills)
 func (a *ProjectRootAdapter) InstallSkill(pkg *packages.Package) error {
+	opencodeSkillsDir := filepath.Join(a.projectRoot, ".opencode", "skills")
+
+	// When the package uses the APM .apm/skills/ layout, copy the entire skill
+	// directory (SKILL.md + bundled resources) to match APM's install behaviour.
+	if pkg.ApmSkillDir != "" {
+		return InstallSkillDir(pkg, filepath.Join(a.projectRoot, ".opencode"), "skills")
+	}
+
 	// For now, only OpenCode supports skills
-	opencodeSkillsDir := filepath.Join(a.projectRoot, ".opencode", "skills", pkg.Name)
-	if err := utils.EnsureDir(opencodeSkillsDir); err != nil {
+	targetDir := filepath.Join(opencodeSkillsDir, pkg.Name)
+	if err := utils.EnsureDir(targetDir); err != nil {
 		return fmt.Errorf("failed to create .opencode/skills directory: %w", err)
 	}
 
 	skillFile := filepath.Join(pkg.Path, "SKILL.md")
-	targetFile := filepath.Join(opencodeSkillsDir, "SKILL.md")
+	targetFile := filepath.Join(targetDir, "SKILL.md")
 
 	if err := utils.CopyFile(skillFile, targetFile); err != nil {
 		return fmt.Errorf("failed to copy SKILL.md: %w", err)

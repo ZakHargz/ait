@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -165,6 +167,63 @@ func (p *PackageMetadata) Write(path string) error {
 	}
 
 	return nil
+}
+
+// FindApmPrimitives scans <pkgDir>/.apm/ for APM-layout agent and skill primitives.
+// It returns:
+//   - agentFile: absolute path to the first *.agent.md found in .apm/agents/
+//     (prefers <pkgName>.agent.md if it exists, otherwise the first match)
+//   - skillDir: absolute path to the skill directory in .apm/skills/<pkgName>/
+//     (or the first available skill subdirectory if <pkgName> doesn't match)
+//
+// Either return value may be empty string if not found.
+// This mirrors the APM spec layout: https://microsoft.github.io/apm/introduction/anatomy-of-an-apm-package/
+func FindApmPrimitives(pkgDir, pkgName string) (agentFile, skillDir string) {
+	apmDir := filepath.Join(pkgDir, ".apm")
+	if _, err := os.Stat(apmDir); err != nil {
+		return "", ""
+	}
+
+	// --- Agent: look in .apm/agents/ for *.agent.md ---
+	agentsDir := filepath.Join(apmDir, "agents")
+	if entries, err := os.ReadDir(agentsDir); err == nil {
+		var firstMatch string
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".agent.md") {
+				full := filepath.Join(agentsDir, entry.Name())
+				// Prefer the file named <pkgName>.agent.md
+				if entry.Name() == pkgName+".agent.md" {
+					agentFile = full
+					break
+				}
+				if firstMatch == "" {
+					firstMatch = full
+				}
+			}
+		}
+		if agentFile == "" {
+			agentFile = firstMatch
+		}
+	}
+
+	// --- Skill: look in .apm/skills/<pkgName>/ ---
+	skillsDir := filepath.Join(apmDir, "skills")
+	namedSkill := filepath.Join(skillsDir, pkgName)
+	if info, err := os.Stat(namedSkill); err == nil && info.IsDir() {
+		skillDir = namedSkill
+	} else {
+		// Fall back to the first available skill subdirectory
+		if entries, err := os.ReadDir(skillsDir); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					skillDir = filepath.Join(skillsDir, entry.Name())
+					break
+				}
+			}
+		}
+	}
+
+	return agentFile, skillDir
 }
 
 // NormaliseType maps APM-compatible types to the closest AIT equivalent.

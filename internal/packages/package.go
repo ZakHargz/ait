@@ -25,16 +25,21 @@ type Package struct {
 	Type     PackageType
 	Path     string // Local path to package files
 	Metadata *config.PackageMetadata
+	// ApmAgentFile is the absolute path to the agent file found in .apm/agents/
+	// (e.g. .apm/agents/my-package.agent.md). Set when the package uses the APM layout.
+	ApmAgentFile string
+	// ApmSkillDir is the absolute path to the skill directory found in .apm/skills/<name>/.
+	// When set, the entire directory (SKILL.md + bundled resources) should be copied on install.
+	ApmSkillDir string
 }
 
 // GetFile returns the platform-specific file for this package.
 // For APM-compatible packages that may not have the standard file name,
 // it walks a list of candidates and returns the first one that exists on disk.
 //
-// For hybrid packages this method returns "" so that callers fall back to the
-// SourceFileName they specify (AGENT.md or SKILL.md depending on which
-// adapter method they are executing).  The actual dual-install dispatch is
-// handled in installToAdapter().
+// The .apm/ layout takes priority: if ApmAgentFile or ApmSkillDir is set the
+// caller should use those directly — GetFile returns "" in that case so the
+// adapter can detect the situation and call InstallPackageDir instead.
 func (p *Package) GetFile(platform string) string {
 	if p.Metadata != nil {
 		// If the metadata explicitly maps this platform, trust it.
@@ -43,16 +48,16 @@ func (p *Package) GetFile(platform string) string {
 		}
 	}
 
-	// Hybrid packages carry both AGENT.md and SKILL.md.  Return "" here so
-	// that the InstallPackageFile helper falls back to the SourceFileName
-	// configured by whichever adapter method (InstallAgent / InstallSkill)
-	// is currently executing.
-	if p.Type == TypeHybrid {
+	// APM .apm/ layout: signal to the caller that it should use the dedicated
+	// ApmAgentFile / ApmSkillDir paths instead of a single file copy.
+	// Return "" so InstallPackageFile falls through to the SourceFileName, and
+	// the adapter checks ApmAgentFile/ApmSkillDir before building the source path.
+	if p.ApmAgentFile != "" || p.ApmSkillDir != "" {
 		return ""
 	}
 
 	// Build candidate list based on normalised type, falling back through
-	// common APM-compatible names so hybrid packages install cleanly.
+	// common APM-compatible names so packages install cleanly.
 	var candidates []string
 	switch p.effectiveType() {
 	case TypeAgent:

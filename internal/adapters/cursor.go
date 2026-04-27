@@ -58,12 +58,17 @@ func (a *CursorAdapter) InstallAgent(pkg *packages.Package) error {
 		return fmt.Errorf("failed to create agent directory: %w", err)
 	}
 
-	// Get source AGENT.md file
-	sourceFile := pkg.GetFile("cursor")
-	if sourceFile == "" {
-		sourceFile = "AGENT.md"
+	// Determine source: prefer APM .apm/agents/ layout over root-level AGENT.md.
+	var source string
+	if pkg.ApmAgentFile != "" {
+		source = pkg.ApmAgentFile
+	} else {
+		sourceFile := pkg.GetFile("cursor")
+		if sourceFile == "" {
+			sourceFile = "AGENT.md"
+		}
+		source = filepath.Join(pkg.Path, sourceFile)
 	}
-	source := filepath.Join(pkg.Path, sourceFile)
 
 	// Read agent content
 	content, err := utils.ReadFile(source)
@@ -71,7 +76,7 @@ func (a *CursorAdapter) InstallAgent(pkg *packages.Package) error {
 		return fmt.Errorf("failed to read agent file: %w", err)
 	}
 
-	// Convert AGENT.md to .cursorrules format
+	// Convert agent content to .cursorrules format
 	// Extract the main content (skip YAML frontmatter)
 	cursorRules := convertToCursorRules(string(content), pkg.Name)
 
@@ -115,6 +120,11 @@ To use this agent in Cursor:
 
 // InstallSkill installs a skill package for Cursor
 func (a *CursorAdapter) InstallSkill(pkg *packages.Package) error {
+	// When the package uses the APM .apm/skills/ layout, copy the entire skill
+	// directory (SKILL.md + bundled resources) to match APM's install behaviour.
+	if pkg.ApmSkillDir != "" {
+		return InstallSkillDir(pkg, a.configDir, "ait-skills")
+	}
 	// Similar to agents, create custom directory
 	return InstallPackageFile(pkg, a.configDir, "cursor", PackageInstallConfig{
 		TargetSubdir:     "ait-skills",

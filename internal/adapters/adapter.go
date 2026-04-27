@@ -76,7 +76,8 @@ type PackageInstallConfig struct {
 }
 
 // InstallPackageFile is a common helper for installing packages
-// It handles directory creation, file copying, and source file resolution
+// It handles directory creation, file copying, and source file resolution.
+// When pkg.ApmAgentFile is set (for agent installs), it is used as the source directly.
 func InstallPackageFile(pkg *packages.Package, configDir, adapterName string, cfg PackageInstallConfig) error {
 	var targetDir string
 
@@ -93,18 +94,43 @@ func InstallPackageFile(pkg *packages.Package, configDir, adapterName string, cf
 		return fmt.Errorf("failed to create %s directory: %w", cfg.TargetSubdir, err)
 	}
 
-	// Get source file
-	sourceFile := pkg.GetFile(adapterName)
-	if sourceFile == "" {
-		sourceFile = cfg.SourceFileName
+	// Determine source path.
+	// Priority: ApmAgentFile (for agent installs from .apm/ layout) > GetFile() > SourceFileName fallback.
+	var source string
+	if pkg.ApmAgentFile != "" && cfg.SourceFileName == "AGENT.md" {
+		// APM .apm/agents/ layout — use the discovered .agent.md file directly.
+		source = pkg.ApmAgentFile
+	} else {
+		sourceFile := pkg.GetFile(adapterName)
+		if sourceFile == "" {
+			sourceFile = cfg.SourceFileName
+		}
+		source = filepath.Join(pkg.Path, sourceFile)
 	}
 
-	source := filepath.Join(pkg.Path, sourceFile)
 	dest := filepath.Join(targetDir, cfg.DestFileName)
 
 	// Copy file
 	if err := utils.CopyFile(source, dest); err != nil {
 		return fmt.Errorf("failed to install %s: %w", cfg.TargetSubdir, err)
+	}
+
+	return nil
+}
+
+// InstallSkillDir installs a skill from the APM .apm/skills/<name>/ directory layout.
+// The entire source directory (SKILL.md + bundled resources) is copied to
+// targetDir/<pkg.Name>/, mirroring what APM does on install.
+func InstallSkillDir(pkg *packages.Package, configDir, skillSubdir string) error {
+	targetDir := filepath.Join(configDir, skillSubdir, pkg.Name)
+
+	// Remove any pre-existing install so stale files are not left behind.
+	if err := os.RemoveAll(targetDir); err != nil {
+		return fmt.Errorf("failed to remove existing skill directory: %w", err)
+	}
+
+	if err := utils.CopyDir(pkg.ApmSkillDir, targetDir); err != nil {
+		return fmt.Errorf("failed to install skill directory: %w", err)
 	}
 
 	return nil

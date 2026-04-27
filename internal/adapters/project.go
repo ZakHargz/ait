@@ -48,15 +48,21 @@ func (p *ProjectAdapter) InstallAgent(pkg *packages.Package) error {
 		return fmt.Errorf("failed to create package directory: %w", err)
 	}
 
-	// Copy AGENT.md
-	agentFile := filepath.Join(pkg.Path, "AGENT.md")
-	if _, err := os.Stat(agentFile); err != nil {
-		return fmt.Errorf("AGENT.md not found: %w", err)
+	// Resolve source: prefer APM .apm/agents/ layout over root-level AGENT.md.
+	var agentSrc string
+	if pkg.ApmAgentFile != "" {
+		agentSrc = pkg.ApmAgentFile
+	} else {
+		agentSrc = filepath.Join(pkg.Path, "AGENT.md")
+	}
+
+	if _, err := os.Stat(agentSrc); err != nil {
+		return fmt.Errorf("agent file not found: %w", err)
 	}
 
 	targetFile := filepath.Join(targetDir, "AGENT.md")
-	if err := utils.CopyFile(agentFile, targetFile); err != nil {
-		return fmt.Errorf("failed to copy AGENT.md: %w", err)
+	if err := utils.CopyFile(agentSrc, targetFile); err != nil {
+		return fmt.Errorf("failed to copy agent file: %w", err)
 	}
 
 	// Copy README if exists
@@ -74,6 +80,12 @@ func (p *ProjectAdapter) InstallSkill(pkg *packages.Package) error {
 	skillsDir := filepath.Join(p.projectRoot, ".ait", "skills")
 	if err := os.MkdirAll(skillsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create skills directory: %w", err)
+	}
+
+	// When the package uses the APM .apm/skills/ layout, copy the entire skill
+	// directory (SKILL.md + bundled resources) to match APM's install behaviour.
+	if pkg.ApmSkillDir != "" {
+		return InstallSkillDir(pkg, filepath.Join(p.projectRoot, ".ait"), "skills")
 	}
 
 	targetDir := filepath.Join(skillsDir, pkg.Name)

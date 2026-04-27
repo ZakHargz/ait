@@ -50,6 +50,11 @@ func (a *ClaudeAdapter) InstallAgent(pkg *packages.Package) error {
 
 // InstallSkill installs a skill package for Claude Desktop
 func (a *ClaudeAdapter) InstallSkill(pkg *packages.Package) error {
+	// When the package uses the APM .apm/skills/ layout, copy the entire skill
+	// directory (SKILL.md + bundled resources) to match APM's install behaviour.
+	if pkg.ApmSkillDir != "" {
+		return InstallSkillDir(pkg, a.configDir, "skills")
+	}
 	// Claude uses same format as OpenCode: skills/<name>/SKILL.md
 	return InstallPackageFile(pkg, a.configDir, "claude", PackageInstallConfig{
 		TargetSubdir:     "skills",

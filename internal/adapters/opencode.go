@@ -52,6 +52,11 @@ func (a *OpenCodeAdapter) InstallAgent(pkg *packages.Package) error {
 
 // InstallSkill installs a skill package for OpenCode
 func (a *OpenCodeAdapter) InstallSkill(pkg *packages.Package) error {
+	// When the package uses the APM .apm/skills/ layout, copy the entire skill
+	// directory (SKILL.md + bundled resources) to match APM's install behaviour.
+	if pkg.ApmSkillDir != "" {
+		return InstallSkillDir(pkg, a.configDir, "skills")
+	}
 	// OpenCode expects: ~/.config/opencode/skills/<name>/SKILL.md
 	return InstallPackageFile(pkg, a.configDir, "opencode", PackageInstallConfig{
 		TargetSubdir:     "skills",

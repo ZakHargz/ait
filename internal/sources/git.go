@@ -79,6 +79,9 @@ func (gs *GitSource) Fetch(spec PackageSpec) (*packages.Package, error) {
 		Metadata: metadata,
 	}
 
+	// Detect APM .apm/ layout and populate agent/skill primitive paths.
+	pkg.ApmAgentFile, pkg.ApmSkillDir = config.FindApmPrimitives(pkgPath, metadata.Name)
+
 	return pkg, nil
 }
 
@@ -450,6 +453,9 @@ func (ls *LocalSource) Fetch(spec PackageSpec) (*packages.Package, error) {
 		Path:     pkgPath,
 		Metadata: metadata,
 	}
+
+	// Detect APM .apm/ layout and populate agent/skill primitive paths.
+	pkg.ApmAgentFile, pkg.ApmSkillDir = config.FindApmPrimitives(pkgPath, metadata.Name)
 
 	return pkg, nil
 }
