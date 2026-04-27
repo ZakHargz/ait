@@ -4,8 +4,8 @@
 class Ait < Formula
   desc "AI Toolkit Package Manager - npm for AI agents, skills, and prompts"
   homepage "https://github.com/ZakHargz/ait"
-  url "https://github.com/ZakHargz/ait/archive/refs/tags/v0.10.0.tar.gz"
-  sha256 "3a33009e2d6a2e6b34c87396cde2ed906a094befd334e1e6f8a0d559dc377ae1"
+  url "https://github.com/ZakHargz/ait/archive/refs/tags/v0.11.0.tar.gz"
+  sha256 "e8f8f0353fe3380991c9e86350d2ca4344a4ad144ed56e7eaf8384018b7899d2"
   license "MIT"
   head "https://github.com/ZakHargz/ait.git", branch: "main"
 
