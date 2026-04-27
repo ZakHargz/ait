@@ -15,6 +15,7 @@ const (
 	TypeSkill  = config.PackageTypeSkill
 	TypePrompt = config.PackageTypePrompt
 	TypeMCP    = config.PackageTypeMCP
+	TypeHybrid = config.PackageTypeHybrid
 )
 
 // Package represents an installed package
@@ -29,12 +30,25 @@ type Package struct {
 // GetFile returns the platform-specific file for this package.
 // For APM-compatible packages that may not have the standard file name,
 // it walks a list of candidates and returns the first one that exists on disk.
+//
+// For hybrid packages this method returns "" so that callers fall back to the
+// SourceFileName they specify (AGENT.md or SKILL.md depending on which
+// adapter method they are executing).  The actual dual-install dispatch is
+// handled in installToAdapter().
 func (p *Package) GetFile(platform string) string {
 	if p.Metadata != nil {
 		// If the metadata explicitly maps this platform, trust it.
 		if file, ok := p.Metadata.Files[platform]; ok {
 			return file
 		}
+	}
+
+	// Hybrid packages carry both AGENT.md and SKILL.md.  Return "" here so
+	// that the InstallPackageFile helper falls back to the SourceFileName
+	// configured by whichever adapter method (InstallAgent / InstallSkill)
+	// is currently executing.
+	if p.Type == TypeHybrid {
+		return ""
 	}
 
 	// Build candidate list based on normalised type, falling back through
@@ -65,7 +79,8 @@ func (p *Package) GetFile(platform string) string {
 	return candidates[0]
 }
 
-// effectiveType returns the package type, normalising APM hybrid → agent.
+// effectiveType returns the package type for file-resolution purposes.
+// Hybrid packages are treated as agents when a single type is needed.
 func (p *Package) effectiveType() PackageType {
 	if p.Metadata != nil {
 		return p.Metadata.NormaliseType()

@@ -236,7 +236,11 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// installToAdapter installs a package using the appropriate adapter method based on package type
+// installToAdapter installs a package using the appropriate adapter method based on package type.
+// Hybrid packages install as both an agent AND a skill so that every file
+// present in the package directory (AGENT.md and SKILL.md) lands in its
+// correct destination (e.g. ~/.config/opencode/agents/ and
+// ~/.config/opencode/skills/ for a global OpenCode install).
 func installToAdapter(pkg *packages.Package, adapter adapters.Adapter, toolName string) error {
 	switch pkg.Type {
 	case packages.TypeAgent:
@@ -244,6 +248,18 @@ func installToAdapter(pkg *packages.Package, adapter adapters.Adapter, toolName 
 
 	case packages.TypeSkill:
 		return adapter.InstallSkill(pkg)
+
+	case packages.TypeHybrid:
+		// Install the agent half first.
+		if err := adapter.InstallAgent(pkg); err != nil {
+			return fmt.Errorf("hybrid agent install failed: %w", err)
+		}
+		// Install the skill half — a missing SKILL.md is a soft warning, not a
+		// hard error, so that packages which only ship AGENT.md still succeed.
+		if err := adapter.InstallSkill(pkg); err != nil {
+			utils.PrintWarning("[%s] skill install skipped for hybrid package %q: %v", toolName, pkg.Name, err)
+		}
+		return nil
 
 	case packages.TypePrompt:
 		return adapter.InstallPrompt(pkg)

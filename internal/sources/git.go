@@ -69,11 +69,12 @@ func (gs *GitSource) Fetch(spec PackageSpec) (*packages.Package, error) {
 		return nil, fmt.Errorf("failed to fetch package: %w", err)
 	}
 
-	// Create package struct
+	// Create package struct — preserve the raw type (including "hybrid") so that
+	// the install layer can dispatch correctly (e.g. write both AGENT.md and SKILL.md).
 	pkg := &packages.Package{
 		Name:     metadata.Name,
 		Version:  metadata.Version,
-		Type:     metadata.NormaliseType(),
+		Type:     metadata.Type,
 		Path:     pkgPath,
 		Metadata: metadata,
 	}
@@ -440,11 +441,12 @@ func (ls *LocalSource) Fetch(spec PackageSpec) (*packages.Package, error) {
 		return nil, fmt.Errorf("failed to fetch package: %w", err)
 	}
 
-	// Create package struct
+	// Create package struct — preserve the raw type (including "hybrid") so that
+	// the install layer can dispatch correctly (e.g. write both AGENT.md and SKILL.md).
 	pkg := &packages.Package{
 		Name:     metadata.Name,
 		Version:  metadata.Version,
-		Type:     metadata.NormaliseType(),
+		Type:     metadata.Type,
 		Path:     pkgPath,
 		Metadata: metadata,
 	}

@@ -112,20 +112,24 @@ func InstallPackageFile(pkg *packages.Package, configDir, adapterName string, cf
 
 // UninstallPackage is a common helper for uninstalling packages
 func UninstallPackage(pkg *packages.Package, configDir string, agentSubdir, skillSubdir, promptSubdir string) error {
-	var targetPath string
-
 	switch pkg.Type {
 	case packages.TypeAgent:
-		targetPath = filepath.Join(configDir, agentSubdir, pkg.Name)
+		return os.RemoveAll(filepath.Join(configDir, agentSubdir, pkg.Name))
 	case packages.TypeSkill:
-		targetPath = filepath.Join(configDir, skillSubdir, pkg.Name)
+		return os.RemoveAll(filepath.Join(configDir, skillSubdir, pkg.Name))
+	case packages.TypeHybrid:
+		// Remove both the agent and skill directories installed by a hybrid package.
+		agentErr := os.RemoveAll(filepath.Join(configDir, agentSubdir, pkg.Name))
+		skillErr := os.RemoveAll(filepath.Join(configDir, skillSubdir, pkg.Name))
+		if agentErr != nil {
+			return agentErr
+		}
+		return skillErr
 	case packages.TypePrompt:
-		targetPath = filepath.Join(configDir, promptSubdir, pkg.Name+".txt")
+		return os.RemoveAll(filepath.Join(configDir, promptSubdir, pkg.Name+".txt"))
 	default:
 		return fmt.Errorf("unsupported package type: %s", pkg.Type)
 	}
-
-	return os.RemoveAll(targetPath)
 }
 
 // ListPackages is a common helper for listing all installed packages
